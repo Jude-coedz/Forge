@@ -1,122 +1,96 @@
-import type { BriefItem, ThesisOption } from "../types";
-import { RemoteAnalysisProvider } from "./remote";
-import type { ProductAnalysisProvider } from "./provider";
+import type { BriefItem, Conversation, ProductQuestion, PrototypeDoc, SpecDoc, ThesisOption } from "../types";
+import { RemoteReasoningProvider } from "./remote";
+import type { ForgeReasoningProvider, ForgeTurnMode } from "./provider";
 
-export type ForgeAnalysis = {
-  productName: string;
-  brief: BriefItem[];
-  theses: ThesisOption[];
-  whyRecommended: string;
+export type ForgeTurnResult = {
+  reply: string;
+  productName?: string;
+  brief?: BriefItem[];
+  questions?: ProductQuestion[];
+  theses?: ThesisOption[];
+  readyForDirections?: boolean;
+  phase?: Conversation["phase"];
+  spec?: SpecDoc | null;
+  prototype?: PrototypeDoc | null;
 };
 
-type RawAnalysis = {
-  productName?: unknown;
-  problem?: unknown;
-  targetUser?: unknown;
-  workaround?: unknown;
-  jobToBeDone?: unknown;
-  constraints?: unknown;
-  evidence?: unknown;
-  unknowns?: unknown;
-  theses?: unknown;
-  whyRecommended?: unknown;
-};
-
-type RawThesis = {
-  title?: unknown;
-  description?: unknown;
-  pros?: unknown;
-  risks?: unknown;
-  score?: unknown;
-  recommended?: unknown;
-};
-
-function text(value: unknown, fallback: string) {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+function cleanBrief(value: unknown): BriefItem[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .filter((item) => item && typeof item === "object")
+    .map((item, index) => {
+      const raw = item as Record<string, unknown>;
+      const provenance = raw.provenance === "evidence" || raw.provenance === "inference" || raw.provenance === "unknown"
+        ? raw.provenance
+        : "unknown";
+      return {
+        id: typeof raw.id === "string" ? raw.id : `brief-${index}`,
+        label: typeof raw.label === "string" ? raw.label : "Working belief",
+        body: typeof raw.body === "string" ? raw.body : "",
+        confidence: raw.confidence === "high" || raw.confidence === "medium" || raw.confidence === "needs-validation"
+          ? raw.confidence
+          : "needs-validation",
+        confirmed: raw.confirmed === true,
+        assumption: provenance !== "evidence",
+        provenance,
+      } satisfies BriefItem;
+    });
 }
 
-function strings(value: unknown) {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-    : [];
+function cleanQuestions(value: unknown): ProductQuestion[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .filter((item) => item && typeof item === "object")
+    .map((item, index) => {
+      const raw = item as Record<string, unknown>;
+      return {
+        id: typeof raw.id === "string" ? raw.id : `q-${index}`,
+        question: typeof raw.question === "string" ? raw.question : "",
+        whyItMatters: typeof raw.whyItMatters === "string" ? raw.whyItMatters : "This could change the product decision.",
+        priority: raw.priority === "critical" || raw.priority === "high" || raw.priority === "medium" ? raw.priority : "high",
+        answered: raw.answered === true,
+        answer: typeof raw.answer === "string" ? raw.answer : undefined,
+      } satisfies ProductQuestion;
+    })
+    .filter((q) => q.question.trim().length > 0);
 }
 
-function confidence(value: unknown): BriefItem["confidence"] {
-  return value === "high" || value === "medium" || value === "needs-validation" ? value : "needs-validation";
-}
-
-function item(id: string, label: string, value: unknown, fallback: string): BriefItem {
-  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-  const evidence = strings(raw.evidence);
-  const body = text(raw.body, fallback);
-  return {
-    id,
-    label,
-    body: evidence.length ? `${body}\n\nEvidence: ${evidence.join(" • ")}` : body,
-    confidence: confidence(raw.confidence),
-    confirmed: false,
-    assumption: typeof raw.assumption === "boolean" ? raw.assumption : evidence.length === 0,
-  };
-}
-
-function normalizeTheses(value: unknown): ThesisOption[] {
-  const input = Array.isArray(value) ? value.slice(0, 3) : [];
-  const ids = ["A", "B", "C"] as const;
-  const fallbackTitles = ["Focused assistant", "Workflow system", "Managed service"];
-
-  const theses = ids.map((id, index) => {
-    const raw = input[index] && typeof input[index] === "object" ? (input[index] as RawThesis) : {};
-    const numericScore = typeof raw.score === "number" ? Math.max(0, Math.min(100, Math.round(raw.score))) : 50;
+function cleanTheses(value: unknown): ThesisOption[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const ids: ThesisOption["id"][] = ["A", "B", "C", "CUSTOM"];
+  return value.slice(0, 4).map((item, index) => {
+    const raw = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
     return {
-      id,
-      title: text(raw.title, fallbackTitles[index]),
-      description: text(raw.description, "A distinct way to solve the problem that still needs validation."),
-      pros: strings(raw.pros).slice(0, 4),
-      risks: strings(raw.risks).slice(0, 4),
-      score: numericScore,
+      id: ids[index] ?? "CUSTOM",
+      title: typeof raw.title === "string" ? raw.title : "Product direction",
+      description: typeof raw.description === "string" ? raw.description : "",
+      pros: Array.isArray(raw.pros) ? raw.pros.filter((x): x is string => typeof x === "string") : [],
+      risks: Array.isArray(raw.risks) ? raw.risks.filter((x): x is string => typeof x === "string") : [],
+      score: typeof raw.score === "number" ? Math.max(0, Math.min(100, Math.round(raw.score))) : 50,
       recommended: raw.recommended === true,
+      userAuthored: raw.userAuthored === true,
     } satisfies ThesisOption;
   });
-
-  let recommendedIndex = theses.findIndex((thesis) => thesis.recommended);
-  if (recommendedIndex < 0) {
-    recommendedIndex = theses.reduce(
-      (best, thesis, index, all) => (thesis.score > all[best].score ? index : best),
-      0,
-    );
-  }
-  return theses.map((thesis, index) => ({ ...thesis, recommended: index === recommendedIndex }));
 }
 
-function normalize(raw: RawAnalysis): ForgeAnalysis {
+export async function runForgeTurn(
+  conversation: Conversation,
+  message: string,
+  mode: ForgeTurnMode = "chat",
+  provider: ForgeReasoningProvider = new RemoteReasoningProvider(),
+): Promise<ForgeTurnResult> {
+  const raw = (await provider.runTurn(conversation, message, mode)) as Record<string, unknown>;
   return {
-    productName: text(raw.productName, "Working title"),
-    brief: [
-      item("problem", "Problem", raw.problem, "The core problem is still unclear."),
-      item("user", "Who it's for", raw.targetUser, "The first beachhead user is still unclear."),
-      item("workaround", "Current workaround", raw.workaround, "The current workaround is unknown."),
-      item("jtbd", "Job to be done", raw.jobToBeDone, "The job to be done needs validation."),
-      item("constraints", "Constraints", raw.constraints, "Important product constraints are still unknown."),
-      item("evidence", "Evidence in the source", raw.evidence, "There is not enough direct evidence yet."),
-      item(
-        "unknowns",
-        "Questions you haven't answered yet",
-        raw.unknowns,
-        "What must be true for this product to deserve to exist?",
-      ),
-    ],
-    theses: normalizeTheses(raw.theses),
-    whyRecommended: text(
-      raw.whyRecommended,
-      "The recommendation needs more evidence before it should be trusted.",
-    ),
+    reply: typeof raw.reply === "string" && raw.reply.trim() ? raw.reply.trim() : "I need a little more context to respond usefully.",
+    productName: typeof raw.productName === "string" ? raw.productName.trim() : undefined,
+    brief: cleanBrief(raw.brief),
+    questions: cleanQuestions(raw.questions),
+    theses: cleanTheses(raw.theses),
+    readyForDirections: typeof raw.readyForDirections === "boolean" ? raw.readyForDirections : undefined,
+    phase: raw.phase === "idle" || raw.phase === "interrogate" || raw.phase === "position" || raw.phase === "spec" || raw.phase === "prototype"
+      ? raw.phase
+      : undefined,
+    spec: raw.spec && typeof raw.spec === "object" ? (raw.spec as SpecDoc) : raw.spec === null ? null : undefined,
+    prototype: raw.prototype && typeof raw.prototype === "object" ? (raw.prototype as PrototypeDoc) : raw.prototype === null ? null : undefined,
   };
-}
-
-export async function analyzeProductSource(
-  source: string,
-  provider: ProductAnalysisProvider = new RemoteAnalysisProvider(),
-): Promise<ForgeAnalysis> {
-  const raw = (await provider.analyzeSource(source)) as RawAnalysis;
-  return normalize(raw);
 }
