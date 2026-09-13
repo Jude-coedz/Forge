@@ -1,12 +1,11 @@
-export type Phase = "idle" | "brief" | "position" | "spec" | "prototype";
+export type Phase = "idle" | "interrogate" | "position" | "spec" | "prototype";
 export type ArtifactKind = "brief" | "thesis" | "spec" | "prototype";
 export type Theme = "dark" | "light";
 export type Confidence = "high" | "medium" | "needs-validation";
 export type Severity = "critical" | "high" | "medium" | "low";
 export type AppScreen = "chat" | "settings";
 
-export type ThesisId = "A" | "B" | "C";
-
+export type ThesisId = "A" | "B" | "C" | "CUSTOM";
 export type ChatRole = "user" | "assistant";
 
 export type ChatMessage = {
@@ -25,6 +24,16 @@ export type BriefItem = {
   confidence: Confidence;
   confirmed: boolean;
   assumption: boolean;
+  provenance?: "evidence" | "inference" | "unknown";
+};
+
+export type ProductQuestion = {
+  id: string;
+  question: string;
+  whyItMatters: string;
+  priority: "critical" | "high" | "medium";
+  answered: boolean;
+  answer?: string;
 };
 
 export type ThesisOption = {
@@ -35,6 +44,7 @@ export type ThesisOption = {
   risks: string[];
   score: number;
   recommended?: boolean;
+  userAuthored?: boolean;
 };
 
 export type Requirement = {
@@ -82,6 +92,7 @@ export type Conversation = {
   messages: ChatMessage[];
   sources: string[];
   brief: BriefItem[];
+  questions: ProductQuestion[];
   theses: ThesisOption[];
   selectedThesis: ThesisId;
   thesisLocked: boolean;
@@ -89,6 +100,7 @@ export type Conversation = {
   prototype: PrototypeDoc | null;
   artifact: ArtifactKind | null;
   productName: string;
+  readyForDirections: boolean;
 };
 
 export type Toast = {
