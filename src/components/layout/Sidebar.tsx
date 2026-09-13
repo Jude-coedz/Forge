@@ -121,7 +121,7 @@ export function Sidebar() {
                     {!editing && (
                       <button
                         onClick={() => setMenuId(menuId === c.id ? null : c.id)}
-                        className={cn("grid size-7 shrink-0 place-items-center rounded-md text-ink-4 hover:bg-raised hover:text-ink", f.sidebarCollapsed ? "md:hidden" : "opacity-0 group-hover:opacity-100 focus:opacity-100")}
+                        className={cn("grid size-7 shrink-0 place-items-center rounded-md text-ink-4 hover:bg-raised hover:text-ink", f.sidebarCollapsed ? "md:hidden" : "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100")}
                         aria-label={`Project options for ${c.title}`}
                       >
                         <MoreHorizontal className="size-4" />
