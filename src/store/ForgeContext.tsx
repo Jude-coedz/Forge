@@ -11,9 +11,32 @@ import {
 import { runForgeTurn } from "../ai/forge";
 import { displayName, specToMarkdown } from "../lib/engine";
 import { uid } from "../lib/id";
-import type { AppScreen, ArtifactKind, ChatMessage, Conversation, Theme, ThesisId, Toast } from "../types";
+import type {
+  AppScreen,
+  ArtifactKind,
+  ChatMessage,
+  Conversation,
+  ProductModel,
+  Theme,
+  ThesisId,
+  Toast,
+} from "../types";
 
 const STORAGE_KEY = "forge-conversations-v2";
+
+function blankProductModel(): ProductModel {
+  return {
+    summary: "",
+    primaryUser: "",
+    opportunity: "",
+    currentWorkaround: "",
+    desiredOutcome: "",
+    evidence: [],
+    assumptions: [],
+    decisions: [],
+    validationTasks: [],
+  };
+}
 
 function blankConversation(): Conversation {
   const t = Date.now();
@@ -26,12 +49,14 @@ function blankConversation(): Conversation {
     messages: [],
     sources: [],
     brief: [],
+    productModel: blankProductModel(),
     questions: [],
     theses: [],
     selectedThesis: "A",
     thesisLocked: false,
     spec: null,
     prototype: null,
+    evalReport: null,
     artifact: null,
     productName: "",
     readyForDirections: false,
@@ -51,8 +76,10 @@ function loadConversations(): Conversation[] {
         return {
           ...blankConversation(),
           ...c,
+          productModel: { ...blankProductModel(), ...(c.productModel ?? {}) },
           questions: c.questions ?? [],
           readyForDirections: c.readyForDirections ?? false,
+          evalReport: c.evalReport ?? null,
           productName: name,
           messages: (c.messages ?? []).map((m) => ({ ...m, streaming: false })),
         };
@@ -90,12 +117,12 @@ type ForgeContextValue = {
   selectThesis: (id: ThesisId) => void;
   lockThesis: () => void;
   buildPrototype: () => void;
+  runEval: () => void;
   openArtifact: (kind: ArtifactKind) => void;
   copySpec: () => void;
   copyPrototype: () => void;
   toast: (t: Omit<Toast, "id">) => void;
   dismissToast: (id: string) => void;
-  later: (feature: string) => void;
 };
 
 const ForgeContext = createContext<ForgeContextValue | null>(null);
@@ -203,9 +230,9 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         ...c,
         messages: c.messages.map((m) => m.id === assistantId ? { ...m, text: snapshot, artifact } : m),
       } : c));
-      timers.current.push(window.setTimeout(tick, 12));
+      timers.current.push(window.setTimeout(tick, 10));
     };
-    timers.current.push(window.setTimeout(tick, 80));
+    timers.current.push(window.setTimeout(tick, 60));
   }, []);
 
   const failReply = useCallback((conversationId: string, assistantId: string, message: string) => {
@@ -213,7 +240,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       ...c,
       messages: c.messages.map((m) => m.id === assistantId ? {
         ...m,
-        text: `I couldn't complete that turn. ${message}`,
+        text: message,
         streaming: false,
       } : m),
     } : c));
@@ -255,7 +282,6 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     try {
       const result = await runForgeTurn(working, content, "chat");
       const productName = result.productName || working.productName;
-      const hasBrief = (result.brief?.length ?? working.brief.length) > 0;
       const shouldAutoTitle = working.title === "New project";
       const patched: Conversation = {
         ...working,
@@ -263,10 +289,11 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         productName,
         title: shouldAutoTitle ? (productName || working.title) : working.title,
         brief: result.brief ?? working.brief,
+        productModel: result.productModel ?? working.productModel,
         questions: result.questions ?? working.questions,
         theses: [],
         readyForDirections: result.readyForDirections ?? working.readyForDirections,
-        artifact: hasBrief ? "brief" : working.artifact,
+        artifact: "brief",
         updatedAt: Date.now(),
       };
       setConversations((list) => list.map((c) => (c.id === conversationId ? patched : c)));
@@ -275,7 +302,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       failReply(
         conversationId,
         thinkingMsg.id,
-        error instanceof Error ? `${error.message} You can retry without retyping your previous messages.` : "Try again in a moment.",
+        error instanceof Error ? error.message : "Forge could not complete that turn. Your work is still saved.",
       );
     }
   }, [activeId, composer, conv, failReply, finishReply, generating]);
@@ -287,7 +314,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     setGenerating(true);
     setConversations((list) => list.map((c) => c.id === conv.id ? working : c));
     try {
-      const result = await runForgeTurn(working, "Show me the product directions now.", "directions");
+      const result = await runForgeTurn(working, "Compare the product directions now.", "directions");
       const theses = result.theses ?? [];
       const selected = theses.find((t) => t.recommended)?.id ?? theses[0]?.id ?? "A";
       const patched: Conversation = {
@@ -296,6 +323,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         theses,
         selectedThesis: selected,
         brief: result.brief ?? working.brief,
+        productModel: result.productModel ?? working.productModel,
         questions: result.questions ?? working.questions,
         readyForDirections: true,
         artifact: "thesis",
@@ -305,7 +333,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       setArtifactOpen(true);
       finishReply(conv.id, thinkingMsg.id, result.reply, "thesis");
     } catch (error) {
-      failReply(conv.id, thinkingMsg.id, error instanceof Error ? error.message : "Try again.");
+      failReply(conv.id, thinkingMsg.id, error instanceof Error ? error.message : "Forge could not compare directions right now.");
     }
   }, [conv, failReply, finishReply, generating]);
 
@@ -323,14 +351,16 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     setGenerating(true);
     setConversations((list) => list.map((c) => c.id === conv.id ? working : c));
     try {
-      const result = await runForgeTurn(working, `I choose ${thesis.title}. Lock this direction and write the spec.`, "lock-thesis");
+      const result = await runForgeTurn(working, `I choose ${thesis.title}. Lock this direction and create the V1 spec.`, "lock-thesis");
       const patched: Conversation = {
         ...working,
         phase: "spec",
         spec: result.spec ?? working.spec,
+        productModel: result.productModel ?? working.productModel,
         brief: result.brief ?? working.brief,
         questions: result.questions ?? working.questions,
         theses: result.theses ?? working.theses,
+        evalReport: null,
         artifact: "spec",
         updatedAt: Date.now(),
       };
@@ -338,13 +368,13 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       setArtifactOpen(true);
       finishReply(conv.id, thinkingMsg.id, result.reply, "spec");
     } catch (error) {
-      failReply(conv.id, thinkingMsg.id, error instanceof Error ? error.message : "Try again.");
+      failReply(conv.id, thinkingMsg.id, error instanceof Error ? error.message : "Forge could not create the spec right now.");
     }
   }, [conv, failReply, finishReply, generating]);
 
   const buildPrototype = useCallback(async () => {
     if (!conv?.spec || !conv.thesisLocked || generating) {
-      if (!conv?.spec) toast({ title: "No spec yet", body: "Choose and lock a direction first.", tone: "warn" });
+      if (!conv?.spec) toast({ title: "No spec yet", body: "Choose a product direction first.", tone: "warn" });
       return;
     }
     const thinkingMsg: ChatMessage = { id: uid(), role: "assistant", text: "", createdAt: Date.now(), streaming: true };
@@ -352,14 +382,48 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     setGenerating(true);
     setConversations((list) => list.map((c) => c.id === conv.id ? working : c));
     try {
-      const result = await runForgeTurn(working, "Build a prototype that tests the core workflow in this spec.", "prototype");
+      const result = await runForgeTurn(working, "Build a prototype that tests the riskiest core workflow in this spec.", "prototype");
       if (!result.prototype) throw new Error("Forge did not return a prototype.");
-      const patched: Conversation = { ...working, phase: "prototype", prototype: result.prototype, artifact: "prototype", updatedAt: Date.now() };
+      const patched: Conversation = {
+        ...working,
+        phase: "prototype",
+        prototype: result.prototype,
+        evalReport: null,
+        artifact: "prototype",
+        updatedAt: Date.now(),
+      };
       setConversations((list) => list.map((c) => (c.id === conv.id ? patched : c)));
       setArtifactOpen(true);
       finishReply(conv.id, thinkingMsg.id, result.reply, "prototype");
     } catch (error) {
-      failReply(conv.id, thinkingMsg.id, error instanceof Error ? error.message : "Try again.");
+      failReply(conv.id, thinkingMsg.id, error instanceof Error ? error.message : "Forge could not build the prototype right now.");
+    }
+  }, [conv, failReply, finishReply, generating, toast]);
+
+  const runEval = useCallback(async () => {
+    if (!conv?.spec || !conv.prototype || generating) {
+      toast({ title: "Nothing to evaluate yet", body: "Create a spec and prototype first.", tone: "warn" });
+      return;
+    }
+    const thinkingMsg: ChatMessage = { id: uid(), role: "assistant", text: "", createdAt: Date.now(), streaming: true };
+    const working = { ...conv, messages: [...conv.messages, thinkingMsg] };
+    setGenerating(true);
+    setConversations((list) => list.map((c) => c.id === conv.id ? working : c));
+    try {
+      const result = await runForgeTurn(working, "Evaluate this prototype against the locked V1 requirements.", "eval");
+      if (!result.evalReport) throw new Error("Forge did not return an eval report.");
+      const patched: Conversation = {
+        ...working,
+        phase: "eval",
+        evalReport: result.evalReport,
+        artifact: "eval",
+        updatedAt: Date.now(),
+      };
+      setConversations((list) => list.map((c) => (c.id === conv.id ? patched : c)));
+      setArtifactOpen(true);
+      finishReply(conv.id, thinkingMsg.id, result.reply, "eval");
+    } catch (error) {
+      failReply(conv.id, thinkingMsg.id, error instanceof Error ? error.message : "Forge could not run the eval right now.");
     }
   }, [conv, failReply, finishReply, generating, toast]);
 
@@ -380,16 +444,12 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     toast({ title: "Prototype copied", body: "HTML is on your clipboard.", tone: "success" });
   }, [conv, toast]);
 
-  const later = useCallback((feature: string) => {
-    toast({ title: "Not available yet", body: `${feature} is not implemented yet.`, tone: "warn" });
-  }, [toast]);
-
   const value = useMemo<ForgeContextValue>(() => ({
     theme, screen, sidebarOpen, sidebarCollapsed, artifactOpen, conversations, activeId, conv, composer, generating, toasts,
     setScreen: (s) => { setScreen(s); setSidebarOpen(false); },
     setSidebarOpen, setSidebarCollapsed, setArtifactOpen, setComposer, toggleTheme, newProject, openConversation, renameConversation, deleteConversation, sendChat,
-    advanceToDirections, selectThesis, lockThesis, buildPrototype, openArtifact, copySpec, copyPrototype, toast, dismissToast, later,
-  }), [theme, screen, sidebarOpen, sidebarCollapsed, artifactOpen, conversations, activeId, conv, composer, generating, toasts, toggleTheme, newProject, openConversation, renameConversation, deleteConversation, sendChat, advanceToDirections, selectThesis, lockThesis, buildPrototype, openArtifact, copySpec, copyPrototype, toast, dismissToast, later]);
+    advanceToDirections, selectThesis, lockThesis, buildPrototype, runEval, openArtifact, copySpec, copyPrototype, toast, dismissToast,
+  }), [theme, screen, sidebarOpen, sidebarCollapsed, artifactOpen, conversations, activeId, conv, composer, generating, toasts, toggleTheme, newProject, openConversation, renameConversation, deleteConversation, sendChat, advanceToDirections, selectThesis, lockThesis, buildPrototype, runEval, openArtifact, copySpec, copyPrototype, toast, dismissToast]);
 
   return <ForgeContext.Provider value={value}>{children}</ForgeContext.Provider>;
 }
