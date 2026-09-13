@@ -7,7 +7,7 @@ type Env = {
 };
 
 type TurnBody = {
-  mode?: "chat" | "directions" | "lock-thesis" | "prototype";
+  mode?: "chat" | "directions" | "lock-thesis" | "prototype" | "eval";
   message?: string;
   conversation?: Record<string, unknown>;
 };
@@ -46,6 +46,75 @@ const questionSchema = {
     answer: { type: "string" },
   },
   required: ["id", "question", "whyItMatters", "priority", "answered", "answer"],
+};
+
+const evidenceSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    id: { type: "string" },
+    claim: { type: "string" },
+    source: { type: "string" },
+    strength: { type: "string", enum: ["strong", "moderate", "weak"] },
+  },
+  required: ["id", "claim", "source", "strength"],
+};
+
+const assumptionSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    id: { type: "string" },
+    claim: { type: "string" },
+    risk: { type: "string", enum: ["value", "usability", "feasibility", "viability"] },
+    status: { type: "string", enum: ["untested", "supported", "invalidated"] },
+  },
+  required: ["id", "claim", "risk", "status"],
+};
+
+const decisionSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    id: { type: "string" },
+    question: { type: "string" },
+    status: { type: "string", enum: ["open", "decided"] },
+    recommendation: { type: "string" },
+    decision: { type: "string" },
+    rationale: { type: "string" },
+    affects: { type: "array", items: { type: "string" }, maxItems: 8 },
+  },
+  required: ["id", "question", "status", "recommendation", "decision", "rationale", "affects"],
+};
+
+const validationTaskSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    id: { type: "string" },
+    assumptionId: { type: "string" },
+    test: { type: "string" },
+    successSignal: { type: "string" },
+    status: { type: "string", enum: ["todo", "done"] },
+  },
+  required: ["id", "assumptionId", "test", "successSignal", "status"],
+};
+
+const productModelSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    summary: { type: "string" },
+    primaryUser: { type: "string" },
+    opportunity: { type: "string" },
+    currentWorkaround: { type: "string" },
+    desiredOutcome: { type: "string" },
+    evidence: { type: "array", items: evidenceSchema, maxItems: 12 },
+    assumptions: { type: "array", items: assumptionSchema, maxItems: 12 },
+    decisions: { type: "array", items: decisionSchema, maxItems: 10 },
+    validationTasks: { type: "array", items: validationTaskSchema, maxItems: 10 },
+  },
+  required: ["summary", "primaryUser", "opportunity", "currentWorkaround", "desiredOutcome", "evidence", "assumptions", "decisions", "validationTasks"],
 };
 
 const thesisSchema = {
@@ -131,12 +200,41 @@ const specSchema = {
   required: ["productName", "thesis", "overview", "requirements", "failureModes", "questions", "metrics", "screens", "validationPlan"],
 };
 
+const evalCheckSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    id: { type: "string" },
+    requirementId: { type: "string" },
+    label: { type: "string" },
+    status: { type: "string", enum: ["pass", "partial", "fail"] },
+    evidence: { type: "string" },
+    issue: { type: "string" },
+    recommendation: { type: "string" },
+  },
+  required: ["id", "requirementId", "label", "status", "evidence", "issue", "recommendation"],
+};
+
+const evalReportSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    summary: { type: "string" },
+    checks: { type: "array", items: evalCheckSchema, minItems: 1, maxItems: 20 },
+    passed: { type: "integer", minimum: 0 },
+    partial: { type: "integer", minimum: 0 },
+    failed: { type: "integer", minimum: 0 },
+    ranAt: { type: "integer" },
+  },
+  required: ["summary", "checks", "passed", "partial", "failed", "ranAt"],
+};
+
 function structuredFormat(mode: string) {
   if (mode === "chat") {
     return {
       type: "json_schema",
       json_schema: {
-        name: "forge_validation_turn",
+        name: "forge_product_model_turn",
         strict: true,
         schema: {
           type: "object",
@@ -146,10 +244,11 @@ function structuredFormat(mode: string) {
             phase: { type: "string", enum: ["interrogate"] },
             productName: { type: "string" },
             brief: { type: "array", items: briefItemSchema, minItems: 1, maxItems: 8 },
+            productModel: productModelSchema,
             questions: { type: "array", items: questionSchema, maxItems: 8 },
             readyForDirections: { type: "boolean" },
           },
-          required: ["reply", "phase", "productName", "brief", "questions", "readyForDirections"],
+          required: ["reply", "phase", "productName", "brief", "productModel", "questions", "readyForDirections"],
         },
       },
     };
@@ -169,11 +268,12 @@ function structuredFormat(mode: string) {
             phase: { type: "string", enum: ["position"] },
             productName: { type: "string" },
             brief: { type: "array", items: briefItemSchema, minItems: 1, maxItems: 8 },
+            productModel: productModelSchema,
             questions: { type: "array", items: questionSchema, maxItems: 8 },
             readyForDirections: { type: "boolean" },
             theses: { type: "array", items: thesisSchema, minItems: 3, maxItems: 3 },
           },
-          required: ["reply", "phase", "productName", "brief", "questions", "readyForDirections", "theses"],
+          required: ["reply", "phase", "productName", "brief", "productModel", "questions", "readyForDirections", "theses"],
         },
       },
     };
@@ -193,12 +293,33 @@ function structuredFormat(mode: string) {
             phase: { type: "string", enum: ["spec"] },
             productName: { type: "string" },
             brief: { type: "array", items: briefItemSchema, minItems: 1, maxItems: 8 },
+            productModel: productModelSchema,
             questions: { type: "array", items: questionSchema, maxItems: 8 },
             theses: { type: "array", items: thesisSchema, minItems: 3, maxItems: 4 },
             readyForDirections: { type: "boolean" },
             spec: specSchema,
           },
-          required: ["reply", "phase", "productName", "brief", "questions", "theses", "readyForDirections", "spec"],
+          required: ["reply", "phase", "productName", "brief", "productModel", "questions", "theses", "readyForDirections", "spec"],
+        },
+      },
+    };
+  }
+
+  if (mode === "eval") {
+    return {
+      type: "json_schema",
+      json_schema: {
+        name: "forge_eval_report",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            reply: { type: "string" },
+            phase: { type: "string", enum: ["eval"] },
+            evalReport: evalReportSchema,
+          },
+          required: ["reply", "phase", "evalReport"],
         },
       },
     };
@@ -233,57 +354,57 @@ function structuredFormat(mode: string) {
 }
 
 function systemPrompt(mode: string) {
-  const core = `You are Forge, an AI builder copilot for turning messy product ideas into decision-backed product definitions and testable prototypes. You are not a generic chatbot, a motivational coach, or an idea generator that rushes to solutions.
+  const core = `You are Forge, an AI builder copilot. Your job is not to keep a conversation going. Your job is to maintain a durable product model that turns messy context into evidence-backed product decisions, requirements, prototypes, and evals.
 
-Your job is to improve the builder's product judgment and preserve the reasoning that leads to the product.
+The user should get more than they would from a generic chat. Every useful turn should improve the Product Model.
+
+PRODUCT MODEL RULES
+- Maintain a concise summary, primary user, dominant opportunity, current workaround, and desired outcome.
+- Maintain evidence separately from assumptions. Evidence must name its source. Never invent customer evidence.
+- Maintain open product decisions. Each decision should explain the recommendation, rationale, and downstream artifacts it affects.
+- Maintain validation tasks for important assumptions that the user cannot answer directly. Unknown is a valid state; do not force the user to guess.
+- Preserve decided items unless new evidence genuinely changes them.
+- Treat the user's own experience as evidence about that user, not automatic proof of a broad market.
 
 PRODUCT THINKING RULES
-- Start from the customer problem or opportunity before choosing a solution.
-- Decompose a messy prompt into distinct opportunity branches before declaring a single 'core problem'. If the user mentions several breakdowns, do not arbitrarily pick one. Ask a discriminating question that helps prioritize them.
-- Prefer concrete behavior, observed incidents, workarounds, and outcomes over opinions.
-- Separate evidence, inference, and unknowns. Never manufacture customer evidence.
-- Treat the user's own experience as evidence about that user, not automatic proof of a broad market.
-- Account for the current workaround, switching cost, frequency, severity, and willingness to change.
-- Reduce the uncertainty most likely to change what product should be built. Consider value, usability, feasibility, and viability risk.
+- Start from customer opportunity before solution.
+- Decompose messy prompts into distinct opportunity branches before choosing a core problem.
+- Prefer concrete behavior, incidents, workarounds, and outcomes over opinions.
+- Account for switching cost, frequency, severity, and willingness to change.
+- Reduce the uncertainty most likely to change the product direction. Consider value, usability, feasibility, and viability risk.
 - Do not invent numeric thresholds, benchmarks, market facts, or false precision.
-- Do not interrogate indefinitely. Once another answer is unlikely to change the product category or primary workflow, stop asking and set readyForDirections=true.
-- The user owns the decision. You recommend, critique, and expose tradeoffs; you do not silently choose for them.
+- Do not interrogate indefinitely. If the user cannot answer something, create a validation task and keep moving when possible.
+- The user owns the decision. Recommend and critique; never silently decide for them.
 
-DECISION READINESS
-Set readyForDirections=true only when all of these are sufficiently clear:
-1. A specific primary user or context is known.
-2. The dominant opportunity/problem is clear enough that competing pain branches are no longer unresolved.
-3. At least one concrete behavior, incident, or repeated pattern supports the problem.
-4. The current workaround or alternative is understood.
-5. The stakes or desired outcome are understood well enough to judge why behavior might change.
-6. No unresolved question is likely to produce a fundamentally different product direction.
+READINESS FOR DIRECTIONS
+Set readyForDirections=true when the product model has a specific user/context, a dominant opportunity, at least one concrete supporting behavior/pattern, an understood workaround, meaningful stakes/outcome, and no unresolved fork likely to produce a fundamentally different product category.
 
-NORMAL CHAT
-- Read the supplied conversation before answering. Never ask for information already present.
-- Treat short replies as answers to the latest relevant question when they fit.
-- If the user asks 'what next?', state the current unresolved product decision and ask the exact question needed to move it forward.
-- Keep replies compact and complete: usually 45-90 words.
-- Never truncate a sentence.
-- Use at most one short insight plus one high-leverage question.
-- When several opportunity branches exist, name them briefly before asking which one dominates.
-- Briefly state why the question changes the product decision. Do not lecture.
-- If enough is known, say so plainly and set readyForDirections=true instead of inventing another question.
-
-The evolving Product Brief should capture: primary user/context, dominant problem/opportunity, current behavior/workaround, stakes/outcome, direct evidence, assumptions, constraints, and important unresolved decisions.`;
+COPILOT RESPONSE STYLE
+- Be concise, specific, and decision-oriented. Usually 45-100 words.
+- Do not prefix every reply with 'Insight:' or 'Question:'. Write naturally.
+- Answer direct questions directly.
+- When the user asks 'what next?', tell them the exact unresolved product decision and the most useful action.
+- Ask at most one question, only when the answer would materially change the product model.
+- If the user likely cannot know the answer, propose a validation task instead of another interrogation.
+- Never praise filler or explain product-management theory unless asked.`;
 
   if (mode === "directions") {
-    return `${core}\n\nThe user explicitly moved to Decide. Generate exactly three materially different product directions anchored to the dominant opportunity, not three feature bundles. Each direction should use a meaningfully different product mechanism or workflow. Compare who it serves, when it is used, why it could win, switching cost, and the largest unresolved risk. Recommend exactly one based only on the evidence. Scores are relative decision confidence, not market probabilities.`;
+    return `${core}\n\nThe user explicitly moved to Decide. Generate exactly three materially different product directions anchored to the dominant opportunity. They must differ in product mechanism or workflow, not just feature scope. Compare why each could win, switching cost, and the largest unresolved risk. Recommend exactly one based on the evidence. Add or update an open decision in the Product Model for the product-direction choice.`;
   }
 
   if (mode === "lock-thesis") {
-    return `${core}\n\nThe user explicitly chose a direction. Generate a decision-backed V1 spec. The spec must trace requirements back to the problem frame and chosen direction. Keep V1 focused. Include acceptance criteria, failure modes, success measures, unresolved questions, and a validation plan across the most relevant value/usability/feasibility/viability risks. If evidence is weak, turn it into a validation item rather than presenting it as fact.`;
+    return `${core}\n\nThe user chose a direction. Update the Product Model so the product-direction decision is marked decided with the chosen direction and rationale. Generate a focused V1 spec. Every P0 requirement must trace back to the chosen direction, an evidence-backed problem, or an explicit assumption. Include acceptance criteria, failure modes, success measures, unresolved questions, and a validation plan. Do not disguise assumptions as requirements.`;
   }
 
   if (mode === "prototype") {
-    return `${core}\n\nGenerate a self-contained clickable HTML prototype from the locked spec. Prototype the riskiest core workflow, not a generic dashboard. Use the actual domain language and include realistic empty, loading, validation, error, confirmation, and recovery states where relevant. The prototype should test product logic, not merely look polished. Use inline CSS and JS only.`;
+    return `${core}\n\nGenerate a self-contained clickable HTML prototype from the locked spec. Prototype the riskiest core workflow, not a generic dashboard. Use actual domain language and realistic states. The prototype should be usable enough for an eval to inspect whether the requirements are represented. Use inline CSS and JS only.`;
   }
 
-  return `${core}\n\nFor this validation turn, update the Product Brief and question history from the user's latest evidence. Preserve previously answered questions. Ask no more than one new high-leverage question. If the prompt contains multiple plausible product problems, keep them separate until the user's evidence distinguishes them.`;
+  if (mode === "eval") {
+    return `${core}\n\nEvaluate the current prototype against the locked spec and its P0 requirements. Inspect the supplied prototype HTML and spec. For each relevant requirement, mark pass, partial, or fail based only on observable evidence in the prototype. A visually present element is not automatically a passed workflow. Explain the evidence, the gap, and a concrete recommendation. Count statuses accurately. This is an implementation-conformance eval, not proof of customer value.`;
+  }
+
+  return `${core}\n\nFor this turn, update the Product Model from the user's latest input. If multiple opportunity branches remain, preserve them as open decisions or assumptions instead of prematurely collapsing them. Only ask a question when it changes the model; otherwise explain what changed and the next useful action.`;
 }
 
 async function callGroq(env: Env, mode: string, body: TurnBody) {
@@ -297,8 +418,8 @@ async function callGroq(env: Env, mode: string, body: TurnBody) {
     },
     body: JSON.stringify({
       model: env.GROQ_MODEL || "openai/gpt-oss-120b",
-      temperature: 0.12,
-      reasoning_effort: mode === "chat" || mode === "prototype" ? "medium" : "high",
+      temperature: 0.1,
+      reasoning_effort: mode === "prototype" ? "medium" : "high",
       messages: [
         { role: "system", content: systemPrompt(mode) },
         {
@@ -313,7 +434,11 @@ async function callGroq(env: Env, mode: string, body: TurnBody) {
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     console.error("Groq turn failed", response.status, response.headers.get("x-request-id"), detail.slice(0, 300));
-    return { error: response.status === 429 ? "Forge is briefly rate-limited. Try again in a moment." : "Forge could not complete this reasoning turn." };
+    return {
+      error: response.status === 429
+        ? "Forge is temporarily at its model rate limit. Your work is saved; wait a moment and retry."
+        : "Forge could not complete this reasoning turn.",
+    };
   }
 
   const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string; refusal?: string | null } }> };
@@ -337,17 +462,24 @@ async function handleTurn(request: Request, env: Env): Promise<Response> {
     return json({ error: "Conversation context is required." }, 400);
   }
 
-  const mode = body.mode === "directions" || body.mode === "lock-thesis" || body.mode === "prototype" ? body.mode : "chat";
+  const mode = body.mode === "directions" || body.mode === "lock-thesis" || body.mode === "prototype" || body.mode === "eval"
+    ? body.mode
+    : "chat";
   const message = typeof body.message === "string" ? body.message.trim() : "";
   if (mode === "chat" && !message) return json({ error: "Message is required." }, 400);
   if (message.length > 30000) return json({ error: "This message is too large for one reasoning turn." }, 413);
 
   const result = await callGroq(env, mode, body);
-  if (typeof result.error === "string") return json({ error: result.error }, 502);
+  if (typeof result.error === "string") {
+    const status = result.error.includes("rate limit") ? 429 : 502;
+    return json({ error: result.error }, status);
+  }
 
   if (mode === "prototype" && result.prototype && typeof result.prototype === "object") {
-    const prototype = result.prototype as Record<string, unknown>;
-    prototype.builtAt = Date.now();
+    (result.prototype as Record<string, unknown>).builtAt = Date.now();
+  }
+  if (mode === "eval" && result.evalReport && typeof result.evalReport === "object") {
+    (result.evalReport as Record<string, unknown>).ranAt = Date.now();
   }
 
   return json(result);
