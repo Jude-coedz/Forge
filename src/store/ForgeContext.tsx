@@ -93,8 +93,7 @@ type ForgeContextValue = {
   newProject: () => void;
   openConversation: (id: string) => void;
   sendChat: (text?: string) => void;
-  confirmBrief: (id: string) => void;
-  markAssumption: (id: string) => void;
+  advanceToDirections: () => void;
   selectThesis: (id: ThesisId) => void;
   lockThesis: () => void;
   buildPrototype: () => void;
@@ -176,21 +175,17 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     setArtifactOpen(false);
   }, []);
 
-  const streamReply = useCallback((conversationId: string, full: string, artifact?: ArtifactKind) => {
+  const finishReply = useCallback((conversationId: string, assistantId: string, full: string, artifact?: ArtifactKind) => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const assistant: ChatMessage = {
-      id: uid(),
-      role: "assistant",
-      text: reduce ? full : "",
-      createdAt: Date.now(),
-      artifact,
-      streaming: !reduce,
-    };
-    setConversations((list) => list.map((c) => (c.id === conversationId ? { ...c, messages: [...c.messages, assistant] } : c)));
     if (reduce) {
+      setConversations((list) => list.map((c) => c.id === conversationId ? {
+        ...c,
+        messages: c.messages.map((m) => m.id === assistantId ? { ...m, text: full, artifact, streaming: false } : m),
+      } : c));
       setGenerating(false);
       return;
     }
+
     const parts = full.split(/(\s+)/);
     let i = 0;
     let acc = "";
@@ -198,7 +193,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       if (i >= parts.length) {
         setConversations((list) => list.map((c) => c.id === conversationId ? {
           ...c,
-          messages: c.messages.map((m) => m.id === assistant.id ? { ...m, text: full, streaming: false } : m),
+          messages: c.messages.map((m) => m.id === assistantId ? { ...m, text: full, artifact, streaming: false } : m),
         } : c));
         setGenerating(false);
         return;
@@ -207,11 +202,23 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       const snapshot = acc;
       setConversations((list) => list.map((c) => c.id === conversationId ? {
         ...c,
-        messages: c.messages.map((m) => m.id === assistant.id ? { ...m, text: snapshot } : m),
+        messages: c.messages.map((m) => m.id === assistantId ? { ...m, text: snapshot, artifact } : m),
       } : c));
-      timers.current.push(window.setTimeout(tick, 16));
+      timers.current.push(window.setTimeout(tick, 12));
     };
-    timers.current.push(window.setTimeout(tick, 120));
+    timers.current.push(window.setTimeout(tick, 80));
+  }, []);
+
+  const failReply = useCallback((conversationId: string, assistantId: string, message: string) => {
+    setConversations((list) => list.map((c) => c.id === conversationId ? {
+      ...c,
+      messages: c.messages.map((m) => m.id === assistantId ? {
+        ...m,
+        text: `I couldn't complete that turn. ${message}`,
+        streaming: false,
+      } : m),
+    } : c));
+    setGenerating(false);
   }, []);
 
   const sendChat = useCallback(async (text?: string) => {
@@ -229,12 +236,13 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     }
 
     const userMsg: ChatMessage = { id: uid(), role: "user", text: content, createdAt: Date.now() };
+    const thinkingMsg: ChatMessage = { id: uid(), role: "assistant", text: "", createdAt: Date.now(), streaming: true };
     const firstTurn = base.phase === "idle";
     const working: Conversation = {
       ...base,
       phase: firstTurn ? "interrogate" : base.phase,
       sources: firstTurn ? [...base.sources, content] : base.sources,
-      messages: [...base.messages, userMsg],
+      messages: [...base.messages, userMsg, thinkingMsg],
       updatedAt: Date.now(),
     };
 
@@ -247,44 +255,59 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
 
     try {
       const result = await runForgeTurn(working, content, "chat");
-      const nextPhase = result.phase ?? (result.readyForDirections ? "position" : "interrogate");
-      const nextArtifact: ArtifactKind | null = nextPhase === "position" && (result.theses?.length ?? 0) > 0
-        ? "thesis"
-        : (result.brief?.length ?? working.brief.length) > 0 ? "brief" : working.artifact;
       const productName = result.productName || working.productName;
+      const hasBrief = (result.brief?.length ?? working.brief.length) > 0;
       const patched: Conversation = {
         ...working,
-        phase: nextPhase,
+        phase: "interrogate",
         productName,
         title: productName || working.title,
         brief: result.brief ?? working.brief,
         questions: result.questions ?? working.questions,
-        theses: result.theses ?? working.theses,
+        theses: [],
         readyForDirections: result.readyForDirections ?? working.readyForDirections,
-        artifact: nextArtifact,
+        artifact: hasBrief ? "brief" : working.artifact,
         updatedAt: Date.now(),
       };
       setConversations((list) => list.map((c) => (c.id === conversationId ? patched : c)));
-      streamReply(conversationId, result.reply, nextArtifact ?? undefined);
+      finishReply(conversationId, thinkingMsg.id, result.reply);
     } catch (error) {
-      setGenerating(false);
-      toast({
-        title: "Forge couldn't reason about that turn",
-        body: error instanceof Error ? error.message : "Try again in a moment.",
-        tone: "danger",
-      });
+      failReply(
+        conversationId,
+        thinkingMsg.id,
+        error instanceof Error ? `${error.message} You can retry without retyping your previous messages.` : "Try again in a moment.",
+      );
     }
-  }, [activeId, composer, conv, generating, streamReply, toast]);
+  }, [activeId, composer, conv, failReply, finishReply, generating]);
 
-  const confirmBrief = useCallback((id: string) => {
-    const item = conv?.brief.find((x) => x.id === id);
-    if (item) void sendChat(`I can confirm this from my own knowledge: ${item.label}: ${item.body}`);
-  }, [conv, sendChat]);
-
-  const markAssumption = useCallback((id: string) => {
-    const item = conv?.brief.find((x) => x.id === id);
-    if (item) void sendChat(`Treat this as an assumption, not evidence: ${item.label}: ${item.body}`);
-  }, [conv, sendChat]);
+  const advanceToDirections = useCallback(async () => {
+    if (!conv || !conv.readyForDirections || generating) return;
+    const thinkingMsg: ChatMessage = { id: uid(), role: "assistant", text: "", createdAt: Date.now(), streaming: true };
+    const working: Conversation = { ...conv, messages: [...conv.messages, thinkingMsg], updatedAt: Date.now() };
+    setGenerating(true);
+    setConversations((list) => list.map((c) => c.id === conv.id ? working : c));
+    try {
+      const result = await runForgeTurn(working, "Show me the product directions now.", "directions");
+      const theses = result.theses ?? [];
+      const selected = theses.find((t) => t.recommended)?.id ?? theses[0]?.id ?? "A";
+      const patched: Conversation = {
+        ...working,
+        phase: "position",
+        theses,
+        selectedThesis: selected,
+        brief: result.brief ?? working.brief,
+        questions: result.questions ?? working.questions,
+        readyForDirections: true,
+        artifact: "thesis",
+        updatedAt: Date.now(),
+      };
+      setConversations((list) => list.map((c) => c.id === conv.id ? patched : c));
+      setArtifactOpen(true);
+      finishReply(conv.id, thinkingMsg.id, result.reply, "thesis");
+    } catch (error) {
+      failReply(conv.id, thinkingMsg.id, error instanceof Error ? error.message : "Try again.");
+    }
+  }, [conv, failReply, finishReply, generating]);
 
   const selectThesis = useCallback((id: ThesisId) => {
     patchActive((c) => ({ ...c, selectedThesis: id, artifact: "thesis" }));
@@ -295,9 +318,11 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     if (!conv || conv.phase !== "position" || generating) return;
     const thesis = conv.theses.find((t) => t.id === conv.selectedThesis);
     if (!thesis) return;
+    const thinkingMsg: ChatMessage = { id: uid(), role: "assistant", text: "", createdAt: Date.now(), streaming: true };
+    const working = { ...conv, thesisLocked: true, messages: [...conv.messages, thinkingMsg] };
     setGenerating(true);
+    setConversations((list) => list.map((c) => c.id === conv.id ? working : c));
     try {
-      const working = { ...conv, thesisLocked: true };
       const result = await runForgeTurn(working, `I choose ${thesis.title}. Lock this direction and write the spec.`, "lock-thesis");
       const patched: Conversation = {
         ...working,
@@ -311,31 +336,32 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       };
       setConversations((list) => list.map((c) => (c.id === conv.id ? patched : c)));
       setArtifactOpen(true);
-      streamReply(conv.id, result.reply, "spec");
+      finishReply(conv.id, thinkingMsg.id, result.reply, "spec");
     } catch (error) {
-      setGenerating(false);
-      toast({ title: "Spec generation failed", body: error instanceof Error ? error.message : "Try again.", tone: "danger" });
+      failReply(conv.id, thinkingMsg.id, error instanceof Error ? error.message : "Try again.");
     }
-  }, [conv, generating, streamReply, toast]);
+  }, [conv, failReply, finishReply, generating]);
 
   const buildPrototype = useCallback(async () => {
     if (!conv?.spec || !conv.thesisLocked || generating) {
       if (!conv?.spec) toast({ title: "No spec yet", body: "Choose and lock a direction first.", tone: "warn" });
       return;
     }
+    const thinkingMsg: ChatMessage = { id: uid(), role: "assistant", text: "", createdAt: Date.now(), streaming: true };
+    const working = { ...conv, messages: [...conv.messages, thinkingMsg] };
     setGenerating(true);
+    setConversations((list) => list.map((c) => c.id === conv.id ? working : c));
     try {
-      const result = await runForgeTurn(conv, "Build a prototype that tests the core workflow in this spec.", "prototype");
+      const result = await runForgeTurn(working, "Build a prototype that tests the core workflow in this spec.", "prototype");
       if (!result.prototype) throw new Error("Forge did not return a prototype.");
-      const patched: Conversation = { ...conv, phase: "prototype", prototype: result.prototype, artifact: "prototype", updatedAt: Date.now() };
+      const patched: Conversation = { ...working, phase: "prototype", prototype: result.prototype, artifact: "prototype", updatedAt: Date.now() };
       setConversations((list) => list.map((c) => (c.id === conv.id ? patched : c)));
       setArtifactOpen(true);
-      streamReply(conv.id, result.reply, "prototype");
+      finishReply(conv.id, thinkingMsg.id, result.reply, "prototype");
     } catch (error) {
-      setGenerating(false);
-      toast({ title: "Prototype generation failed", body: error instanceof Error ? error.message : "Try again.", tone: "danger" });
+      failReply(conv.id, thinkingMsg.id, error instanceof Error ? error.message : "Try again.");
     }
-  }, [conv, generating, streamReply, toast]);
+  }, [conv, failReply, finishReply, generating, toast]);
 
   const openArtifact = useCallback((kind: ArtifactKind) => {
     patchActive((c) => ({ ...c, artifact: kind }));
@@ -362,8 +388,8 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     theme, screen, sidebarOpen, sidebarCollapsed, artifactOpen, conversations, activeId, conv, composer, generating, toasts,
     setScreen: (s) => { setScreen(s); setSidebarOpen(false); },
     setSidebarOpen, setSidebarCollapsed, setArtifactOpen, setComposer, toggleTheme, newProject, openConversation, sendChat,
-    confirmBrief, markAssumption, selectThesis, lockThesis, buildPrototype, openArtifact, copySpec, copyPrototype, toast, dismissToast, later,
-  }), [theme, screen, sidebarOpen, sidebarCollapsed, artifactOpen, conversations, activeId, conv, composer, generating, toasts, toggleTheme, newProject, openConversation, sendChat, confirmBrief, markAssumption, selectThesis, lockThesis, buildPrototype, openArtifact, copySpec, copyPrototype, toast, dismissToast, later]);
+    advanceToDirections, selectThesis, lockThesis, buildPrototype, openArtifact, copySpec, copyPrototype, toast, dismissToast, later,
+  }), [theme, screen, sidebarOpen, sidebarCollapsed, artifactOpen, conversations, activeId, conv, composer, generating, toasts, toggleTheme, newProject, openConversation, sendChat, advanceToDirections, selectThesis, lockThesis, buildPrototype, openArtifact, copySpec, copyPrototype, toast, dismissToast, later]);
 
   return <ForgeContext.Provider value={value}>{children}</ForgeContext.Provider>;
 }
