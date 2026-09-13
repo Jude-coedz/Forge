@@ -1,4 +1,4 @@
-import type { BriefItem, Conversation, ProductQuestion, PrototypeDoc, SpecDoc, ThesisOption } from "../types";
+import type { BriefItem, Conversation, DiscoveryReadiness, ProductQuestion, PrototypeDoc, SpecDoc, ThesisOption } from "../types";
 import { RemoteReasoningProvider } from "./remote";
 import type { ForgeReasoningProvider, ForgeTurnMode } from "./provider";
 
@@ -7,6 +7,7 @@ export type ForgeTurnResult = {
   productName?: string;
   brief?: BriefItem[];
   questions?: ProductQuestion[];
+  readiness?: DiscoveryReadiness;
   theses?: ThesisOption[];
   readyForDirections?: boolean;
   phase?: Conversation["phase"];
@@ -55,6 +56,18 @@ function cleanQuestions(value: unknown): ProductQuestion[] | undefined {
     .filter((q) => q.question.trim().length > 0);
 }
 
+function cleanReadiness(value: unknown): DiscoveryReadiness | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  return {
+    userKnown: raw.userKnown === true,
+    painObserved: raw.painObserved === true,
+    currentBehaviorKnown: raw.currentBehaviorKnown === true,
+    stakesKnown: raw.stakesKnown === true,
+    riskiestUnknown: typeof raw.riskiestUnknown === "string" ? raw.riskiestUnknown.trim() : "",
+  };
+}
+
 function cleanTheses(value: unknown): ThesisOption[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const ids: ThesisOption["id"][] = ["A", "B", "C", "CUSTOM"];
@@ -85,6 +98,7 @@ export async function runForgeTurn(
     productName: typeof raw.productName === "string" ? raw.productName.trim() : undefined,
     brief: cleanBrief(raw.brief),
     questions: cleanQuestions(raw.questions),
+    readiness: cleanReadiness(raw.readiness),
     theses: cleanTheses(raw.theses),
     readyForDirections: typeof raw.readyForDirections === "boolean" ? raw.readyForDirections : undefined,
     phase: raw.phase === "idle" || raw.phase === "interrogate" || raw.phase === "position" || raw.phase === "spec" || raw.phase === "prototype"
