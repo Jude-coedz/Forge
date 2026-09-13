@@ -37,7 +37,7 @@ function Message({ message }: { message: ChatMessage }) {
         {isUser ? (
           <p className="whitespace-pre-wrap text-pretty text-[15px] leading-7 text-ink">{message.text}</p>
         ) : message.streaming && !message.text ? (
-          <p className="text-[13px] text-ink-4">Reading the source…</p>
+          <p className="text-[13px] text-ink-4">Thinking through the decision…</p>
         ) : (
           <Prose text={message.text} />
         )}
@@ -50,7 +50,7 @@ function Message({ message }: { message: ChatMessage }) {
             {message.artifact === "thesis" && <Lock className="size-3.5 text-molten" />}
             {message.artifact === "spec" && <PanelsTopLeft className="size-3.5 text-temper" />}
             {message.artifact === "prototype" && <AppWindow className="size-3.5 text-temper" />}
-            Open {message.artifact === "thesis" ? "positioning" : message.artifact === "prototype" ? "prototype preview" : message.artifact}
+            Open {message.artifact === "brief" ? "working model" : message.artifact === "thesis" ? "product directions" : message.artifact === "prototype" ? "prototype" : "spec"}
           </button>
         )}
         {f.generating && message.streaming && (
