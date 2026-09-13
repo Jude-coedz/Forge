@@ -1,27 +1,31 @@
 import type { Conversation } from "../types";
 import { AIProviderError, type ForgeReasoningProvider, type ForgeTurnMode } from "./provider";
 
-const DISCOVERY_GUIDE = [
-  "Separate the customer problem from solution ideas.",
+const PRODUCT_GUIDE = [
+  "Treat chat as input to a durable product model, not as the product itself.",
+  "Separate customer opportunities from solution ideas.",
   "Prefer concrete behavior and outcomes over opinions.",
-  "Ask about the riskiest assumption first.",
-  "Consider value, usability, feasibility, and viability risk.",
-  "Keep normal chat to one useful insight and one question.",
+  "Preserve evidence, assumptions, open decisions, and why decisions were made.",
+  "Reduce the riskiest assumption across value, usability, feasibility, and viability.",
+  "If the user cannot answer a question, convert the unknown into a validation task instead of blocking progress.",
 ];
 
 function compactConversation(conversation: Conversation) {
   return {
     phase: conversation.phase,
     productName: conversation.productName,
-    discoveryGuide: DISCOVERY_GUIDE,
+    productGuide: PRODUCT_GUIDE,
     sources: conversation.sources,
     brief: conversation.brief,
+    productModel: conversation.productModel,
     questions: conversation.questions,
     theses: conversation.theses,
     selectedThesis: conversation.selectedThesis,
     thesisLocked: conversation.thesisLocked,
     spec: conversation.spec,
-    messages: conversation.messages.slice(-14).map(({ role, text }) => ({ role, text })),
+    prototype: conversation.prototype,
+    evalReport: conversation.evalReport,
+    messages: conversation.messages.slice(-12).map(({ role, text }) => ({ role, text })),
   };
 }
 
@@ -52,7 +56,7 @@ export class RemoteReasoningProvider implements ForgeReasoningProvider {
         });
       } catch {
         if (attempt === 0 && !signal?.aborted) {
-          await wait(350);
+          await wait(500);
           continue;
         }
         throw new AIProviderError(lastError);
@@ -63,7 +67,7 @@ export class RemoteReasoningProvider implements ForgeReasoningProvider {
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
       lastError = payload?.error || `Forge reasoning failed with status ${response.status}.`;
       if (attempt === 0 && transient(response.status) && !signal?.aborted) {
-        await wait(400);
+        await wait(response.status === 429 ? 1200 : 600);
         continue;
       }
       throw new AIProviderError(lastError);

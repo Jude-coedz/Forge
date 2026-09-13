@@ -1,10 +1,12 @@
 import { Menu, Moon, PanelRight, Sun } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useForge } from "../../store/ForgeContext";
-import { ArtifactPane } from "../artifacts/ArtifactPane";
-import { ChatView } from "../chat/ChatView";
+import { ArtifactDrawer } from "../artifacts/ArtifactDrawer";
+import { Welcome } from "../chat/Welcome";
 import { SettingsView } from "../pages/SettingsView";
 import { Button } from "../ui/primitives";
+import { CopilotPanel } from "../workspace/CopilotPanel";
+import { ProductWorkspace } from "../workspace/ProductWorkspace";
 import { Sidebar } from "./Sidebar";
 
 export function AppShell() {
@@ -13,16 +15,18 @@ export function AppShell() {
   return (
     <div className={f.theme === "dark" ? "dark" : ""}>
       <div className="relative flex h-dvh overflow-hidden bg-canvas text-ink">
-        <div className="grain pointer-events-none absolute inset-0 opacity-50" />
         <Sidebar />
         <div className="relative flex min-w-0 flex-1 flex-col">
           <TopBar />
           {f.screen === "settings" ? (
             <SettingsView />
+          ) : !f.conv ? (
+            <Welcome />
           ) : (
             <div className="flex min-h-0 flex-1">
-              <ChatView />
-              <ArtifactPane />
+              <ProductWorkspace />
+              <CopilotPanel />
+              <ArtifactDrawer />
             </div>
           )}
         </div>
@@ -34,17 +38,25 @@ export function AppShell() {
 
 function TopBar() {
   const f = useForge();
-  const title = f.screen === "settings" ? "Settings" : f.conv?.title ?? "Forge";
+  const title = f.screen === "settings" ? "Settings" : f.conv?.title;
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-2 sm:px-3">
+    <header className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-canvas px-2.5 sm:px-3.5">
       <Button size="icon" variant="ghost" className="md:hidden" onClick={() => f.setSidebarOpen(true)} aria-label="Open sidebar">
         <Menu className="size-4" />
       </Button>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium">{title}</p>
+        {title ? (
+          <div className="flex min-w-0 items-center gap-2 text-[11px] text-ink-4">
+            <span>{f.screen === "settings" ? "Forge" : "Projects"}</span>
+            <span>/</span>
+            <span className="truncate text-ink-2">{title}</span>
+          </div>
+        ) : (
+          <span className="text-[11px] text-ink-4">Forge</span>
+        )}
       </div>
-      <Button size="icon" variant="ghost" onClick={f.toggleTheme} aria-label="Toggle theme">
+      <Button size="icon" variant="ghost" onClick={f.toggleTheme} aria-label="Toggle theme" title="Toggle appearance">
         {f.theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
       </Button>
       {f.conv?.artifact && (
@@ -53,8 +65,8 @@ function TopBar() {
           variant="ghost"
           className={cn(f.artifactOpen && "bg-inset")}
           onClick={() => f.setArtifactOpen(!f.artifactOpen)}
-          aria-label="Toggle artifact"
-          title="Open the current product artifact"
+          aria-label="Toggle output"
+          title="Open current build output"
         >
           <PanelRight className="size-4" />
         </Button>
@@ -67,7 +79,7 @@ function Toasts() {
   const { toasts, dismissToast } = useForge();
   if (!toasts.length) return null;
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-80 max-w-[calc(100%-2rem)] flex-col gap-2">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[70] flex w-80 max-w-[calc(100%-2rem)] flex-col gap-2">
       {toasts.map((t) => (
         <button
           key={t.id}
