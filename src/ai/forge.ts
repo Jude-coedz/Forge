@@ -73,6 +73,31 @@ function cleanTheses(value: unknown): ThesisOption[] | undefined {
   });
 }
 
+function clipWords(text: string, max: number) {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= max) return text.trim();
+  return `${words.slice(0, max).join(" ")}…`;
+}
+
+function compactChatReply(value: unknown, mode: ForgeTurnMode) {
+  const fallback = "I need a little more context to respond usefully.";
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  const text = value.trim();
+  if (mode !== "chat") return text;
+
+  const words = text.split(/\s+/);
+  if (words.length <= 110) return text;
+
+  const paragraphs = text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const insight = clipWords(paragraphs[0] ?? text, 42);
+  const question = [...paragraphs].reverse().find((p) => p.includes("?"));
+  const why = paragraphs.find((p) => /why this matters|this matters because/i.test(p));
+  const parts = [insight];
+  if (question && question !== paragraphs[0]) parts.push(clipWords(question, 45));
+  if (why && why !== question && why !== paragraphs[0]) parts.push(clipWords(why, 22));
+  return clipWords(parts.join("\n\n"), 110);
+}
+
 export async function runForgeTurn(
   conversation: Conversation,
   message: string,
@@ -81,7 +106,7 @@ export async function runForgeTurn(
 ): Promise<ForgeTurnResult> {
   const raw = (await provider.runTurn(conversation, message, mode)) as Record<string, unknown>;
   return {
-    reply: typeof raw.reply === "string" && raw.reply.trim() ? raw.reply.trim() : "I need a little more context to respond usefully.",
+    reply: compactChatReply(raw.reply, mode),
     productName: typeof raw.productName === "string" ? raw.productName.trim() : undefined,
     brief: cleanBrief(raw.brief),
     questions: cleanQuestions(raw.questions),
