@@ -73,46 +73,9 @@ function cleanTheses(value: unknown): ThesisOption[] | undefined {
   });
 }
 
-function clipWords(text: string, max: number) {
-  const words = text.trim().split(/\s+/);
-  if (words.length <= max) return text.trim();
-  return `${words.slice(0, max).join(" ")}…`;
-}
-
-function compactChatReply(value: unknown, mode: ForgeTurnMode) {
-  const fallback = "I need a little more context to respond usefully.";
-  if (typeof value !== "string" || !value.trim()) return fallback;
-  const text = value.trim();
-  if (mode !== "chat") return text;
-
-  const words = text.split(/\s+/);
-  if (words.length <= 110) return text;
-
-  const paragraphs = text.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
-  const insight = clipWords(paragraphs[0] ?? text, 42);
-  const question = [...paragraphs].reverse().find((p) => p.includes("?"));
-  const why = paragraphs.find((p) => /why this matters|this matters because/i.test(p));
-  const parts = [insight];
-  if (question && question !== paragraphs[0]) parts.push(clipWords(question, 45));
-  if (why && why !== question && why !== paragraphs[0]) parts.push(clipWords(why, 22));
-  return clipWords(parts.join("\n\n"), 110);
-}
-
-function known(item: BriefItem) {
-  return item.body.trim().length > 0 && item.provenance !== "unknown";
-}
-
-function matches(item: BriefItem, ids: string[], label: RegExp) {
-  return known(item) && (ids.includes(item.id) || label.test(item.label));
-}
-
-function briefReadyForDirections(brief: BriefItem[] | undefined) {
-  if (!brief?.length) return false;
-  const hasUser = brief.some((item) => matches(item, ["user", "targetUser"], /user|who.*for|customer/i));
-  const hasProblem = brief.some((item) => matches(item, ["problem", "pain"], /problem|pain|failure/i));
-  const hasBehavior = brief.some((item) => matches(item, ["currentBehavior", "workaround"], /current|workaround|today|behavior/i));
-  const hasStakes = brief.some((item) => matches(item, ["stakes", "outcome"], /stake|outcome|impact|cost|why.*matter/i));
-  return hasUser && hasProblem && hasBehavior && hasStakes;
+function cleanReply(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return "I need a little more context to respond usefully.";
+  return value.trim();
 }
 
 export async function runForgeTurn(
@@ -123,14 +86,13 @@ export async function runForgeTurn(
 ): Promise<ForgeTurnResult> {
   const raw = (await provider.runTurn(conversation, message, mode)) as Record<string, unknown>;
   const brief = cleanBrief(raw.brief);
-  const derivedReady = mode === "chat" ? briefReadyForDirections(brief) : undefined;
   return {
-    reply: compactChatReply(raw.reply, mode),
+    reply: cleanReply(raw.reply),
     productName: typeof raw.productName === "string" ? raw.productName.trim() : undefined,
     brief,
     questions: cleanQuestions(raw.questions),
     theses: cleanTheses(raw.theses),
-    readyForDirections: derivedReady ?? (typeof raw.readyForDirections === "boolean" ? raw.readyForDirections : undefined),
+    readyForDirections: typeof raw.readyForDirections === "boolean" ? raw.readyForDirections : undefined,
     phase: raw.phase === "idle" || raw.phase === "interrogate" || raw.phase === "position" || raw.phase === "spec" || raw.phase === "prototype"
       ? raw.phase
       : undefined,

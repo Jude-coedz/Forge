@@ -14,7 +14,6 @@ import { uid } from "../lib/id";
 import type { AppScreen, ArtifactKind, ChatMessage, Conversation, Theme, ThesisId, Toast } from "../types";
 
 const STORAGE_KEY = "forge-conversations-v2";
-const ACTIVE_KEY = "forge-active-v2";
 
 function blankConversation(): Conversation {
   const t = Date.now();
@@ -45,31 +44,23 @@ function loadConversations(): Conversation[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Conversation[];
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((c) => {
-      const source = (c.sources ?? []).join("\n");
-      const name = displayName(c.productName, source);
-      return {
-        ...blankConversation(),
-        ...c,
-        questions: c.questions ?? [],
-        readyForDirections: c.readyForDirections ?? false,
-        productName: name,
-        messages: (c.messages ?? []).map((m) => ({ ...m, streaming: false })),
-      };
-    });
+    return parsed
+      .map((c) => {
+        const source = (c.sources ?? []).join("\n");
+        const name = displayName(c.productName, source);
+        return {
+          ...blankConversation(),
+          ...c,
+          questions: c.questions ?? [],
+          readyForDirections: c.readyForDirections ?? false,
+          productName: name,
+          messages: (c.messages ?? []).map((m) => ({ ...m, streaming: false })),
+        };
+      })
+      .filter((c) => c.messages.length > 0 || c.phase !== "idle");
   } catch {
     return [];
   }
-}
-
-function loadActiveId(conversations: Conversation[]) {
-  try {
-    const id = localStorage.getItem(ACTIVE_KEY);
-    if (id && conversations.some((c) => c.id === id)) return id;
-  } catch {
-    // ignore storage failures
-  }
-  return null;
 }
 
 type ForgeContextValue = {
@@ -92,6 +83,8 @@ type ForgeContextValue = {
   toggleTheme: () => void;
   newProject: () => void;
   openConversation: (id: string) => void;
+  renameConversation: (id: string, title: string) => void;
+  deleteConversation: (id: string) => void;
   sendChat: (text?: string) => void;
   advanceToDirections: () => void;
   selectThesis: (id: ThesisId) => void;
@@ -119,7 +112,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [artifactOpen, setArtifactOpen] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>(loadConversations);
-  const [activeId, setActiveId] = useState<string | null>(() => loadActiveId(loadConversations()));
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
   const [generating, setGenerating] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -128,10 +121,6 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
   const conv = conversations.find((c) => c.id === activeId) ?? null;
 
   useEffect(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations)), [conversations]);
-  useEffect(() => {
-    if (activeId) localStorage.setItem(ACTIVE_KEY, activeId);
-    else localStorage.removeItem(ACTIVE_KEY);
-  }, [activeId]);
   useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
 
   const toast = useCallback((t: Omit<Toast, "id">) => {
@@ -159,9 +148,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const newProject = useCallback(() => {
-    const next = blankConversation();
-    setConversations((list) => [next, ...list]);
-    setActiveId(next.id);
+    setActiveId(null);
     setScreen("chat");
     setSidebarOpen(false);
     setArtifactOpen(false);
@@ -172,6 +159,18 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     setActiveId(id);
     setScreen("chat");
     setSidebarOpen(false);
+    setArtifactOpen(false);
+  }, []);
+
+  const renameConversation = useCallback((id: string, title: string) => {
+    const next = title.trim();
+    if (!next) return;
+    setConversations((list) => list.map((c) => c.id === id ? { ...c, title: next, updatedAt: Date.now() } : c));
+  }, []);
+
+  const deleteConversation = useCallback((id: string) => {
+    setConversations((list) => list.filter((c) => c.id !== id));
+    setActiveId((current) => current === id ? null : current);
     setArtifactOpen(false);
   }, []);
 
@@ -257,11 +256,12 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       const result = await runForgeTurn(working, content, "chat");
       const productName = result.productName || working.productName;
       const hasBrief = (result.brief?.length ?? working.brief.length) > 0;
+      const shouldAutoTitle = working.title === "New project";
       const patched: Conversation = {
         ...working,
         phase: "interrogate",
         productName,
-        title: productName || working.title,
+        title: shouldAutoTitle ? (productName || working.title) : working.title,
         brief: result.brief ?? working.brief,
         questions: result.questions ?? working.questions,
         theses: [],
@@ -387,9 +387,9 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ForgeContextValue>(() => ({
     theme, screen, sidebarOpen, sidebarCollapsed, artifactOpen, conversations, activeId, conv, composer, generating, toasts,
     setScreen: (s) => { setScreen(s); setSidebarOpen(false); },
-    setSidebarOpen, setSidebarCollapsed, setArtifactOpen, setComposer, toggleTheme, newProject, openConversation, sendChat,
+    setSidebarOpen, setSidebarCollapsed, setArtifactOpen, setComposer, toggleTheme, newProject, openConversation, renameConversation, deleteConversation, sendChat,
     advanceToDirections, selectThesis, lockThesis, buildPrototype, openArtifact, copySpec, copyPrototype, toast, dismissToast, later,
-  }), [theme, screen, sidebarOpen, sidebarCollapsed, artifactOpen, conversations, activeId, conv, composer, generating, toasts, toggleTheme, newProject, openConversation, sendChat, advanceToDirections, selectThesis, lockThesis, buildPrototype, openArtifact, copySpec, copyPrototype, toast, dismissToast, later]);
+  }), [theme, screen, sidebarOpen, sidebarCollapsed, artifactOpen, conversations, activeId, conv, composer, generating, toasts, toggleTheme, newProject, openConversation, renameConversation, deleteConversation, sendChat, advanceToDirections, selectThesis, lockThesis, buildPrototype, openArtifact, copySpec, copyPrototype, toast, dismissToast, later]);
 
   return <ForgeContext.Provider value={value}>{children}</ForgeContext.Provider>;
 }
