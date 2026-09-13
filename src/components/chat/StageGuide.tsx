@@ -1,4 +1,4 @@
-import { ArrowRight, FileText, Route } from "lucide-react";
+import { ArrowRight, FileText, Lightbulb, Route, Sparkles } from "lucide-react";
 import { useForge } from "../../store/ForgeContext";
 import { Button } from "../ui/primitives";
 
@@ -48,6 +48,15 @@ export function StageGuide() {
               <Button size="sm" variant="temper" onClick={f.advanceToDirections} disabled={f.generating}>
                 <Route className="size-3.5" /> Explore directions <ArrowRight className="size-3.5" />
               </Button>
+            )}
+            {conv.phase === "position" && (
+              <Button size="sm" variant="temper" onClick={() => f.openArtifact("thesis")}><Lightbulb className="size-3.5" /> Compare directions</Button>
+            )}
+            {conv.phase === "spec" && (
+              <Button size="sm" variant="temper" onClick={() => f.openArtifact("spec")}><FileText className="size-3.5" /> Review spec</Button>
+            )}
+            {conv.phase === "prototype" && (
+              <Button size="sm" variant="temper" onClick={() => f.openArtifact("prototype")}><Sparkles className="size-3.5" /> Open prototype</Button>
             )}
           </div>
         </div>
