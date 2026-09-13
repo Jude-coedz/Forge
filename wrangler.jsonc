@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "forge",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-13",
+  "vars": {
+    "GROQ_MODEL": "qwen/qwen3.8-27b"
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  }
+}
