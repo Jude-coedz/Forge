@@ -1,7 +1,6 @@
 import { Menu, Moon, PanelRight, Sun } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useForge } from "../../store/ForgeContext";
-import type { Phase } from "../../types";
 import { ArtifactPane } from "../artifacts/ArtifactPane";
 import { ChatView } from "../chat/ChatView";
 import { SettingsView } from "../pages/SettingsView";
@@ -45,7 +44,6 @@ function TopBar() {
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-medium">{title}</p>
       </div>
-      {f.screen === "chat" && f.conv && f.conv.phase !== "idle" && <PhaseSteps phase={f.conv.phase} />}
       <Button size="icon" variant="ghost" onClick={f.toggleTheme} aria-label="Toggle theme">
         {f.theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
       </Button>
@@ -56,39 +54,12 @@ function TopBar() {
           className={cn(f.artifactOpen && "bg-inset")}
           onClick={() => f.setArtifactOpen(!f.artifactOpen)}
           aria-label="Toggle artifact"
+          title="Open the current product artifact"
         >
           <PanelRight className="size-4" />
         </Button>
       )}
     </header>
-  );
-}
-
-function PhaseSteps({ phase }: { phase: Phase }) {
-  const steps: { id: Phase; label: string }[] = [
-    { id: "brief", label: "Capture" },
-    { id: "position", label: "Category" },
-    { id: "spec", label: "Spec" },
-    { id: "prototype", label: "Prototype" },
-  ];
-  const order: Phase[] = ["idle", "brief", "position", "spec", "prototype"];
-  const current = order.indexOf(phase);
-
-  return (
-    <ol className="hidden items-center gap-1 sm:flex">
-      {steps.map((s, i) => {
-        const done = current > order.indexOf(s.id) || phase === s.id;
-        const on = phase === s.id || (s.id === "brief" && phase === "idle");
-        return (
-          <li key={s.id} className="flex items-center gap-1">
-            {i > 0 && <span className="text-ink-4">/</span>}
-            <span className={cn("text-[11px]", on ? "font-medium text-ink" : done ? "text-ink-3" : "text-ink-4")}>
-              {s.label}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
   );
 }
 

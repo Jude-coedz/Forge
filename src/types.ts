@@ -66,6 +66,13 @@ export type FailureMode = {
   containment: string;
 };
 
+export type ValidationItem = {
+  risk: "value" | "usability" | "feasibility" | "viability";
+  assumption: string;
+  test: string;
+  successSignal: string;
+};
+
 export type SpecDoc = {
   productName: string;
   thesis: string;
@@ -75,6 +82,7 @@ export type SpecDoc = {
   questions: string[];
   metrics: { name: string; target: string }[];
   screens: string[];
+  validationPlan?: ValidationItem[];
 };
 
 export type PrototypeDoc = {
