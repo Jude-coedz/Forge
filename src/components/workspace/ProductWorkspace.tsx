@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useForge } from "../../store/ForgeContext";
 import { Button, Pill } from "../ui/primitives";
-import type { ArtifactKind, Conversation } from "../../types";
+import type { Conversation } from "../../types";
 
 const stages = ["Model", "Direction", "Spec", "Prototype", "Eval"];
 
