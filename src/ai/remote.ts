@@ -10,22 +10,44 @@ const PRODUCT_GUIDE = [
   "If the user cannot answer a question, convert the unknown into a validation task instead of blocking progress.",
 ];
 
-function compactConversation(conversation: Conversation) {
-  return {
+function compactConversation(conversation: Conversation, mode: ForgeTurnMode) {
+  const base = {
     phase: conversation.phase,
     productName: conversation.productName,
     productGuide: PRODUCT_GUIDE,
-    sources: conversation.sources,
-    brief: conversation.brief,
     productModel: conversation.productModel,
     questions: conversation.questions,
     theses: conversation.theses,
     selectedThesis: conversation.selectedThesis,
     thesisLocked: conversation.thesisLocked,
-    spec: conversation.spec,
-    prototype: conversation.prototype,
-    evalReport: conversation.evalReport,
-    messages: conversation.messages.slice(-12).map(({ role, text }) => ({ role, text })),
+  };
+
+  if (mode === "prototype") {
+    return {
+      ...base,
+      spec: conversation.spec,
+      messages: conversation.messages.slice(-3).map(({ role, text }) => ({ role, text })),
+    };
+  }
+
+  if (mode === "eval") {
+    return {
+      ...base,
+      spec: conversation.spec,
+      prototype: conversation.prototype,
+    };
+  }
+
+  if (mode === "lock-thesis") {
+    return {
+      ...base,
+      messages: conversation.messages.slice(-5).map(({ role, text }) => ({ role, text })),
+    };
+  }
+
+  return {
+    ...base,
+    messages: conversation.messages.slice(-6).map(({ role, text }) => ({ role, text })),
   };
 }
 
@@ -37,6 +59,8 @@ function transient(status: number) {
   return status === 429 || status === 502 || status === 503 || status === 504;
 }
 
+const RETRY_DELAYS = [700, 1600, 3200];
+
 export class RemoteReasoningProvider implements ForgeReasoningProvider {
   readonly name = "forge-api";
 
@@ -45,18 +69,18 @@ export class RemoteReasoningProvider implements ForgeReasoningProvider {
   async runTurn(conversation: Conversation, message: string, mode: ForgeTurnMode = "chat", signal?: AbortSignal) {
     let lastError = "Could not reach Forge's reasoning service.";
 
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    for (let attempt = 0; attempt < RETRY_DELAYS.length + 1; attempt += 1) {
       let response: Response;
       try {
         response = await fetch(this.endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal,
-          body: JSON.stringify({ mode, message, conversation: compactConversation(conversation) }),
+          body: JSON.stringify({ mode, message, conversation: compactConversation(conversation, mode) }),
         });
       } catch {
-        if (attempt === 0 && !signal?.aborted) {
-          await wait(500);
+        if (attempt < RETRY_DELAYS.length && !signal?.aborted) {
+          await wait(RETRY_DELAYS[attempt]);
           continue;
         }
         throw new AIProviderError(lastError);
@@ -66,8 +90,8 @@ export class RemoteReasoningProvider implements ForgeReasoningProvider {
 
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
       lastError = payload?.error || `Forge reasoning failed with status ${response.status}.`;
-      if (attempt === 0 && transient(response.status) && !signal?.aborted) {
-        await wait(response.status === 429 ? 1200 : 600);
+      if (attempt < RETRY_DELAYS.length && transient(response.status) && !signal?.aborted) {
+        await wait(RETRY_DELAYS[attempt]);
         continue;
       }
       throw new AIProviderError(lastError);
