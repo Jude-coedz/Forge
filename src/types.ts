@@ -1,4 +1,4 @@
-export type Phase = "idle" | "interrogate" | "position" | "spec" | "prototype";
+export type Phase = "idle" | "brief" | "interrogate" | "position" | "spec" | "prototype";
 export type ArtifactKind = "brief" | "thesis" | "spec" | "prototype";
 export type Theme = "dark" | "light";
 export type Confidence = "high" | "medium" | "needs-validation";
