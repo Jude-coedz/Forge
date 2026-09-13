@@ -10,22 +10,44 @@ const PRODUCT_GUIDE = [
   "If the user cannot answer a question, convert the unknown into a validation task instead of blocking progress.",
 ];
 
-function compactConversation(conversation: Conversation) {
-  return {
+function compactConversation(conversation: Conversation, mode: ForgeTurnMode) {
+  const base = {
     phase: conversation.phase,
     productName: conversation.productName,
     productGuide: PRODUCT_GUIDE,
-    sources: conversation.sources,
-    brief: conversation.brief,
     productModel: conversation.productModel,
     questions: conversation.questions,
     theses: conversation.theses,
     selectedThesis: conversation.selectedThesis,
     thesisLocked: conversation.thesisLocked,
-    spec: conversation.spec,
-    prototype: conversation.prototype,
-    evalReport: conversation.evalReport,
-    messages: conversation.messages.slice(-12).map(({ role, text }) => ({ role, text })),
+  };
+
+  if (mode === "prototype") {
+    return {
+      ...base,
+      spec: conversation.spec,
+      messages: conversation.messages.slice(-3).map(({ role, text }) => ({ role, text })),
+    };
+  }
+
+  if (mode === "eval") {
+    return {
+      ...base,
+      spec: conversation.spec,
+      prototype: conversation.prototype,
+    };
+  }
+
+  if (mode === "lock-thesis") {
+    return {
+      ...base,
+      messages: conversation.messages.slice(-5).map(({ role, text }) => ({ role, text })),
+    };
+  }
+
+  return {
+    ...base,
+    messages: conversation.messages.slice(-6).map(({ role, text }) => ({ role, text })),
   };
 }
 
@@ -54,7 +76,7 @@ export class RemoteReasoningProvider implements ForgeReasoningProvider {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal,
-          body: JSON.stringify({ mode, message, conversation: compactConversation(conversation) }),
+          body: JSON.stringify({ mode, message, conversation: compactConversation(conversation, mode) }),
         });
       } catch {
         if (attempt < RETRY_DELAYS.length && !signal?.aborted) {
