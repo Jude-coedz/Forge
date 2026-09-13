@@ -1,5 +1,5 @@
-export type Phase = "idle" | "brief" | "interrogate" | "position" | "spec" | "prototype";
-export type ArtifactKind = "brief" | "thesis" | "spec" | "prototype";
+export type Phase = "idle" | "brief" | "interrogate" | "position" | "spec" | "prototype" | "eval";
+export type ArtifactKind = "brief" | "thesis" | "spec" | "prototype" | "eval";
 export type Theme = "dark" | "light";
 export type Confidence = "high" | "medium" | "needs-validation";
 export type Severity = "critical" | "high" | "medium" | "low";
@@ -7,6 +7,7 @@ export type AppScreen = "chat" | "settings";
 
 export type ThesisId = "A" | "B" | "C" | "CUSTOM";
 export type ChatRole = "user" | "assistant";
+export type ProductRisk = "value" | "usability" | "feasibility" | "viability";
 
 export type ChatMessage = {
   id: string;
@@ -34,6 +35,50 @@ export type ProductQuestion = {
   priority: "critical" | "high" | "medium";
   answered: boolean;
   answer?: string;
+};
+
+export type EvidenceNode = {
+  id: string;
+  claim: string;
+  source: string;
+  strength: "strong" | "moderate" | "weak";
+};
+
+export type AssumptionNode = {
+  id: string;
+  claim: string;
+  risk: ProductRisk;
+  status: "untested" | "supported" | "invalidated";
+};
+
+export type DecisionNode = {
+  id: string;
+  question: string;
+  status: "open" | "decided";
+  recommendation: string;
+  decision: string;
+  rationale: string;
+  affects: string[];
+};
+
+export type ValidationTask = {
+  id: string;
+  assumptionId: string;
+  test: string;
+  successSignal: string;
+  status: "todo" | "done";
+};
+
+export type ProductModel = {
+  summary: string;
+  primaryUser: string;
+  opportunity: string;
+  currentWorkaround: string;
+  desiredOutcome: string;
+  evidence: EvidenceNode[];
+  assumptions: AssumptionNode[];
+  decisions: DecisionNode[];
+  validationTasks: ValidationTask[];
 };
 
 export type ThesisOption = {
@@ -67,7 +112,7 @@ export type FailureMode = {
 };
 
 export type ValidationItem = {
-  risk: "value" | "usability" | "feasibility" | "viability";
+  risk: ProductRisk;
   assumption: string;
   test: string;
   successSignal: string;
@@ -91,6 +136,25 @@ export type PrototypeDoc = {
   builtAt: number;
 };
 
+export type EvalCheck = {
+  id: string;
+  requirementId: string;
+  label: string;
+  status: "pass" | "partial" | "fail";
+  evidence: string;
+  issue: string;
+  recommendation: string;
+};
+
+export type EvalReport = {
+  summary: string;
+  checks: EvalCheck[];
+  passed: number;
+  partial: number;
+  failed: number;
+  ranAt: number;
+};
+
 export type Conversation = {
   id: string;
   title: string;
@@ -100,12 +164,14 @@ export type Conversation = {
   messages: ChatMessage[];
   sources: string[];
   brief: BriefItem[];
+  productModel: ProductModel;
   questions: ProductQuestion[];
   theses: ThesisOption[];
   selectedThesis: ThesisId;
   thesisLocked: boolean;
   spec: SpecDoc | null;
   prototype: PrototypeDoc | null;
+  evalReport: EvalReport | null;
   artifact: ArtifactKind | null;
   productName: string;
   readyForDirections: boolean;
