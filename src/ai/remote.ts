@@ -1,10 +1,19 @@
 import type { Conversation } from "../types";
 import { AIProviderError, type ForgeReasoningProvider, type ForgeTurnMode } from "./provider";
 
+const DISCOVERY_GUIDE = [
+  "Separate the customer problem from solution ideas.",
+  "Prefer concrete behavior and outcomes over opinions.",
+  "Ask about the riskiest assumption first.",
+  "Consider value, usability, feasibility, and viability risk.",
+  "Keep normal chat to one useful insight and one question.",
+];
+
 function compactConversation(conversation: Conversation) {
   return {
     phase: conversation.phase,
     productName: conversation.productName,
+    discoveryGuide: DISCOVERY_GUIDE,
     sources: conversation.sources,
     brief: conversation.brief,
     questions: conversation.questions,
