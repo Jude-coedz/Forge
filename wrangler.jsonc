@@ -4,7 +4,7 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-13",
   "vars": {
-    "GROQ_MODEL": "qwen/qwen3.8-27b"
+    "GROQ_MODEL": "openai/gpt-oss-120b"
   },
   "assets": {
     "directory": "./dist",
