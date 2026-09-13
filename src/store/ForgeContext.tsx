@@ -8,22 +8,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { analyzeProductSource } from "../ai/forge";
-import { applyTurn, buildSpec, displayName, specToMarkdown, type Turn } from "../lib/engine";
-import { generatePrototype } from "../lib/prototype";
+import { runForgeTurn } from "../ai/forge";
+import { displayName, specToMarkdown } from "../lib/engine";
 import { uid } from "../lib/id";
-import type {
-  AppScreen,
-  ArtifactKind,
-  ChatMessage,
-  Conversation,
-  Theme,
-  ThesisId,
-  Toast,
-} from "../types";
+import type { AppScreen, ArtifactKind, ChatMessage, Conversation, Theme, ThesisId, Toast } from "../types";
 
-const STORAGE_KEY = "forge-conversations-v1";
-const ACTIVE_KEY = "forge-active-v1";
+const STORAGE_KEY = "forge-conversations-v2";
+const ACTIVE_KEY = "forge-active-v2";
 
 function blankConversation(): Conversation {
   const t = Date.now();
@@ -36,13 +27,15 @@ function blankConversation(): Conversation {
     messages: [],
     sources: [],
     brief: [],
+    questions: [],
     theses: [],
-    selectedThesis: "B",
+    selectedThesis: "A",
     thesisLocked: false,
     spec: null,
     prototype: null,
     artifact: null,
     productName: "",
+    readyForDirections: false,
   };
 }
 
@@ -56,13 +49,11 @@ function loadConversations(): Conversation[] {
       const source = (c.sources ?? []).join("\n");
       const name = displayName(c.productName, source);
       return {
+        ...blankConversation(),
         ...c,
+        questions: c.questions ?? [],
+        readyForDirections: c.readyForDirections ?? false,
         productName: name,
-        title: /^whatsapp$/i.test(c.title ?? "") ? name || c.title : c.title,
-        prototype: c.prototype ?? null,
-        spec: c.spec
-          ? { ...c.spec, productName: displayName(c.spec.productName, source) || c.spec.productName }
-          : c.spec,
         messages: (c.messages ?? []).map((m) => ({ ...m, streaming: false })),
       };
     });
@@ -76,17 +67,9 @@ function loadActiveId(conversations: Conversation[]) {
     const id = localStorage.getItem(ACTIVE_KEY);
     if (id && conversations.some((c) => c.id === id)) return id;
   } catch {
-    /* ignore */
+    // ignore storage failures
   }
   return null;
-}
-
-function shouldUseAI(conv: Conversation, turn: Turn) {
-  return conv.phase === "idle" && turn.artifact === "brief" && turn.patch.phase === "brief";
-}
-
-function aiBriefReply(productName: string, whyRecommended: string) {
-  return `I pulled a working brief out of that and separated what you actually gave me from what still needs validation.\n\n**${productName}** is only a working name. Nothing is locked yet.\n\nI also surfaced the questions you have not answered yet — those matter more than another feature list.\n\n${whyRecommended}\n\nCheck the brief, challenge the assumptions, then we will make the product-category decision. I will not write a spec until that decision is locked.`;
 }
 
 type ForgeContextValue = {
@@ -135,7 +118,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
   const [screen, setScreen] = useState<AppScreen>("chat");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [artifactOpen, setArtifactOpen] = useState(true);
+  const [artifactOpen, setArtifactOpen] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>(loadConversations);
   const [activeId, setActiveId] = useState<string | null>(() => loadActiveId(loadConversations()));
   const [composer, setComposer] = useState("");
@@ -145,30 +128,20 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
 
   const conv = conversations.find((c) => c.id === activeId) ?? null;
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
-  }, [conversations]);
-
+  useEffect(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations)), [conversations]);
   useEffect(() => {
     if (activeId) localStorage.setItem(ACTIVE_KEY, activeId);
     else localStorage.removeItem(ACTIVE_KEY);
   }, [activeId]);
-
-  useEffect(() => {
-    return () => {
-      timers.current.forEach((t) => window.clearTimeout(t));
-    };
-  }, []);
+  useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
 
   const toast = useCallback((t: Omit<Toast, "id">) => {
     const id = uid();
     setToasts((prev) => [...prev, { ...t, id }]);
-    window.setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 3400);
+    window.setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 3600);
   }, []);
 
-  const dismissToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((x) => x.id !== id));
-  }, []);
+  const dismissToast = useCallback((id: string) => setToasts((prev) => prev.filter((x) => x.id !== id)), []);
 
   const patchActive = useCallback(
     (fn: (c: Conversation) => Conversation) => {
@@ -187,23 +160,20 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const newProject = useCallback(() => {
-    const blank = conversations.find((c) => c.phase === "idle" && c.messages.length === 0);
-    if (blank) {
-      setActiveId(blank.id);
-    } else {
-      const next = blankConversation();
-      setConversations((list) => [next, ...list]);
-      setActiveId(next.id);
-    }
+    const next = blankConversation();
+    setConversations((list) => [next, ...list]);
+    setActiveId(next.id);
     setScreen("chat");
     setSidebarOpen(false);
+    setArtifactOpen(false);
     setComposer("");
-  }, [conversations]);
+  }, []);
 
   const openConversation = useCallback((id: string) => {
     setActiveId(id);
     setScreen("chat");
     setSidebarOpen(false);
+    setArtifactOpen(false);
   }, []);
 
   const streamReply = useCallback((conversationId: string, full: string, artifact?: ArtifactKind) => {
@@ -216,9 +186,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       artifact,
       streaming: !reduce,
     };
-    setConversations((list) =>
-      list.map((c) => (c.id === conversationId ? { ...c, messages: [...c.messages, assistant] } : c)),
-    );
+    setConversations((list) => list.map((c) => (c.id === conversationId ? { ...c, messages: [...c.messages, assistant] } : c)));
     if (reduce) {
       setGenerating(false);
       return;
@@ -228,178 +196,151 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     let acc = "";
     const tick = () => {
       if (i >= parts.length) {
-        setConversations((list) =>
-          list.map((c) =>
-            c.id === conversationId
-              ? {
-                  ...c,
-                  messages: c.messages.map((m) => (m.id === assistant.id ? { ...m, text: full, streaming: false } : m)),
-                }
-              : c,
-          ),
-        );
+        setConversations((list) => list.map((c) => c.id === conversationId ? {
+          ...c,
+          messages: c.messages.map((m) => m.id === assistant.id ? { ...m, text: full, streaming: false } : m),
+        } : c));
         setGenerating(false);
         return;
       }
       acc += parts[i++];
       const snapshot = acc;
-      setConversations((list) =>
-        list.map((c) =>
-          c.id === conversationId
-            ? {
-                ...c,
-                messages: c.messages.map((m) => (m.id === assistant.id ? { ...m, text: snapshot } : m)),
-              }
-            : c,
-        ),
-      );
-      const delay = /\n/.test(parts[i - 1] ?? "") ? 28 : 10;
-      timers.current.push(window.setTimeout(tick, delay));
+      setConversations((list) => list.map((c) => c.id === conversationId ? {
+        ...c,
+        messages: c.messages.map((m) => m.id === assistant.id ? { ...m, text: snapshot } : m),
+      } : c));
+      timers.current.push(window.setTimeout(tick, 16));
     };
-    timers.current.push(window.setTimeout(tick, 240));
+    timers.current.push(window.setTimeout(tick, 120));
   }, []);
 
-  const sendChat = useCallback(
-    async (text?: string) => {
-      const content = (text ?? composer).trim();
-      if (!content || generating) return;
+  const sendChat = useCallback(async (text?: string) => {
+    const content = (text ?? composer).trim();
+    if (!content || generating) return;
 
-      let conversationId = activeId;
-      let base = conv;
-      if (!base || !conversationId) {
-        const created = blankConversation();
-        conversationId = created.id;
-        base = created;
-        setConversations((list) => [created, ...list]);
-        setActiveId(created.id);
-      }
+    let conversationId = activeId;
+    let base = conv;
+    if (!base || !conversationId) {
+      const created = blankConversation();
+      conversationId = created.id;
+      base = created;
+      setConversations((list) => [created, ...list]);
+      setActiveId(created.id);
+    }
 
-      const userMsg: ChatMessage = {
-        id: uid(),
-        role: "user",
-        text: content,
-        createdAt: Date.now(),
-      };
+    const userMsg: ChatMessage = { id: uid(), role: "user", text: content, createdAt: Date.now() };
+    const firstTurn = base.phase === "idle";
+    const working: Conversation = {
+      ...base,
+      phase: firstTurn ? "interrogate" : base.phase,
+      sources: firstTurn ? [...base.sources, content] : base.sources,
+      messages: [...base.messages, userMsg],
+      updatedAt: Date.now(),
+    };
 
-      const working: Conversation = {
-        ...base,
-        messages: [...base.messages, userMsg],
-        updatedAt: Date.now(),
-      };
+    setComposer("");
+    setGenerating(true);
+    setConversations((list) => {
+      const exists = list.some((c) => c.id === conversationId);
+      return exists ? list.map((c) => (c.id === conversationId ? working : c)) : [working, ...list];
+    });
 
-      setComposer("");
-      setGenerating(true);
-      setConversations((list) => {
-        const exists = list.some((c) => c.id === conversationId);
-        if (!exists) return [working, ...list];
-        return list.map((c) => (c.id === conversationId ? working : c));
-      });
-
-      const fallback = applyTurn(working, content);
-      let result = fallback;
-
-      if (shouldUseAI(working, fallback)) {
-        try {
-          const analysis = await analyzeProductSource(content);
-          const selectedThesis = analysis.theses.find((thesis) => thesis.recommended)?.id ?? "B";
-          result = {
-            reply: aiBriefReply(analysis.productName, analysis.whyRecommended),
-            artifact: "brief",
-            patch: {
-              phase: "brief",
-              brief: analysis.brief,
-              theses: analysis.theses,
-              selectedThesis,
-              productName: analysis.productName,
-              title: analysis.productName,
-              sources: [...working.sources, content],
-              artifact: "brief",
-              spec: null,
-              thesisLocked: false,
-            },
-          };
-        } catch {
-          toast({
-            title: "Using local fallback",
-            body: "Forge could not reach Ollama, so this turn used the deterministic engine.",
-            tone: "warn",
-          });
-        }
-      }
-
+    try {
+      const result = await runForgeTurn(working, content, "chat");
+      const nextPhase = result.phase ?? (result.readyForDirections ? "position" : "interrogate");
+      const nextArtifact: ArtifactKind | null = nextPhase === "position" && (result.theses?.length ?? 0) > 0
+        ? "thesis"
+        : (result.brief?.length ?? working.brief.length) > 0 ? "brief" : working.artifact;
+      const productName = result.productName || working.productName;
       const patched: Conversation = {
         ...working,
-        ...result.patch,
+        phase: nextPhase,
+        productName,
+        title: productName || working.title,
+        brief: result.brief ?? working.brief,
+        questions: result.questions ?? working.questions,
+        theses: result.theses ?? working.theses,
+        readyForDirections: result.readyForDirections ?? working.readyForDirections,
+        artifact: nextArtifact,
         updatedAt: Date.now(),
       };
-
-      setConversations((list) => {
-        const exists = list.some((c) => c.id === conversationId);
-        if (!exists) return [patched, ...list];
-        return list.map((c) => (c.id === conversationId ? patched : c));
+      setConversations((list) => list.map((c) => (c.id === conversationId ? patched : c)));
+      streamReply(conversationId, result.reply, nextArtifact ?? undefined);
+    } catch (error) {
+      setGenerating(false);
+      toast({
+        title: "Forge couldn't reason about that turn",
+        body: error instanceof Error ? error.message : "Try again in a moment.",
+        tone: "danger",
       });
-      if (result.artifact) setArtifactOpen(true);
-      streamReply(conversationId, result.reply, result.artifact ?? undefined);
-    },
-    [activeId, composer, conv, generating, streamReply, toast],
-  );
+    }
+  }, [activeId, composer, conv, generating, streamReply, toast]);
 
-  const confirmBrief = useCallback(
-    (id: string) => {
-      patchActive((c) => ({
-        ...c,
-        brief: c.brief.map((b) => (b.id === id ? { ...b, confirmed: true, assumption: false } : b)),
-      }));
-    },
-    [patchActive],
-  );
+  const confirmBrief = useCallback((id: string) => {
+    const item = conv?.brief.find((x) => x.id === id);
+    if (item) void sendChat(`I can confirm this from my own knowledge: ${item.label}: ${item.body}`);
+  }, [conv, sendChat]);
 
-  const markAssumption = useCallback(
-    (id: string) => {
-      patchActive((c) => ({
-        ...c,
-        brief: c.brief.map((item) =>
-          item.id === id ? { ...item, assumption: true, confirmed: false, confidence: "needs-validation" } : item,
-        ),
-      }));
-    },
-    [patchActive],
-  );
+  const markAssumption = useCallback((id: string) => {
+    const item = conv?.brief.find((x) => x.id === id);
+    if (item) void sendChat(`Treat this as an assumption, not evidence: ${item.label}: ${item.body}`);
+  }, [conv, sendChat]);
 
-  const selectThesis = useCallback(
-    (id: ThesisId) => {
-      patchActive((c) => ({ ...c, selectedThesis: id, artifact: "thesis" }));
-      setArtifactOpen(true);
-    },
-    [patchActive],
-  );
-
-  const lockThesis = useCallback(() => {
-    if (!conv || conv.phase === "idle") return;
-    const spec = buildSpec({ ...conv, thesisLocked: true });
-    patchActive((c) => ({
-      ...c,
-      thesisLocked: true,
-      spec,
-      phase: "spec",
-      artifact: "spec",
-    }));
+  const selectThesis = useCallback((id: ThesisId) => {
+    patchActive((c) => ({ ...c, selectedThesis: id, artifact: "thesis" }));
     setArtifactOpen(true);
-    setGenerating(true);
-    streamReply(
-      conv.id,
-      `Locked **${conv.theses.find((t) => t.id === conv.selectedThesis)?.title ?? "this category"}**.\n\nI wrote the spec for **${spec.productName}**, including failure modes. Ask me to build a prototype when you want a clickable preview — Lovable-shaped, but constrained by this spec.`,
-      "spec",
-    );
-  }, [conv, patchActive, streamReply]);
+  }, [patchActive]);
 
-  const openArtifact = useCallback(
-    (kind: ArtifactKind) => {
-      patchActive((c) => ({ ...c, artifact: kind }));
+  const lockThesis = useCallback(async () => {
+    if (!conv || conv.phase !== "position" || generating) return;
+    const thesis = conv.theses.find((t) => t.id === conv.selectedThesis);
+    if (!thesis) return;
+    setGenerating(true);
+    try {
+      const working = { ...conv, thesisLocked: true };
+      const result = await runForgeTurn(working, `I choose ${thesis.title}. Lock this direction and write the spec.`, "lock-thesis");
+      const patched: Conversation = {
+        ...working,
+        phase: "spec",
+        spec: result.spec ?? working.spec,
+        brief: result.brief ?? working.brief,
+        questions: result.questions ?? working.questions,
+        theses: result.theses ?? working.theses,
+        artifact: "spec",
+        updatedAt: Date.now(),
+      };
+      setConversations((list) => list.map((c) => (c.id === conv.id ? patched : c)));
       setArtifactOpen(true);
-    },
-    [patchActive],
-  );
+      streamReply(conv.id, result.reply, "spec");
+    } catch (error) {
+      setGenerating(false);
+      toast({ title: "Spec generation failed", body: error instanceof Error ? error.message : "Try again.", tone: "danger" });
+    }
+  }, [conv, generating, streamReply, toast]);
+
+  const buildPrototype = useCallback(async () => {
+    if (!conv?.spec || !conv.thesisLocked || generating) {
+      if (!conv?.spec) toast({ title: "No spec yet", body: "Choose and lock a direction first.", tone: "warn" });
+      return;
+    }
+    setGenerating(true);
+    try {
+      const result = await runForgeTurn(conv, "Build a prototype that tests the core workflow in this spec.", "prototype");
+      if (!result.prototype) throw new Error("Forge did not return a prototype.");
+      const patched: Conversation = { ...conv, phase: "prototype", prototype: result.prototype, artifact: "prototype", updatedAt: Date.now() };
+      setConversations((list) => list.map((c) => (c.id === conv.id ? patched : c)));
+      setArtifactOpen(true);
+      streamReply(conv.id, result.reply, "prototype");
+    } catch (error) {
+      setGenerating(false);
+      toast({ title: "Prototype generation failed", body: error instanceof Error ? error.message : "Try again.", tone: "danger" });
+    }
+  }, [conv, generating, streamReply, toast]);
+
+  const openArtifact = useCallback((kind: ArtifactKind) => {
+    patchActive((c) => ({ ...c, artifact: kind }));
+    setArtifactOpen(true);
+  }, [patchActive]);
 
   const copySpec = useCallback(() => {
     if (!conv?.spec) return;
@@ -410,107 +351,19 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
   const copyPrototype = useCallback(() => {
     if (!conv?.prototype) return;
     void navigator.clipboard.writeText(conv.prototype.html);
-    toast({ title: "Prototype HTML copied", body: "Paste it into an .html file and open it.", tone: "success" });
+    toast({ title: "Prototype copied", body: "HTML is on your clipboard.", tone: "success" });
   }, [conv, toast]);
 
-  const buildPrototype = useCallback(() => {
-    if (!conv?.spec || !conv.thesisLocked) {
-      toast({ title: "Lock a category first", body: "No prototype until the spec exists.", tone: "warn" });
-      return;
-    }
-    const prototype = generatePrototype(conv);
-    patchActive((c) => ({
-      ...c,
-      prototype,
-      phase: "prototype",
-      artifact: "prototype",
-    }));
-    setArtifactOpen(true);
-    setGenerating(true);
-    streamReply(
-      conv.id,
-      `Built a clickable prototype for **${conv.spec.productName}**.\n\n${prototype.summary}\n\nOpen the preview. Try marking paid or sending — it should stop you. Hosted export to Lovable / v0 is later.`,
-      "prototype",
-    );
-  }, [conv, patchActive, streamReply, toast]);
+  const later = useCallback((feature: string) => {
+    toast({ title: "Not available yet", body: `${feature} is not implemented yet.`, tone: "warn" });
+  }, [toast]);
 
-  const later = useCallback(
-    (feature: string) => {
-      toast({
-        title: "Later — not faked",
-        body: `${feature} is not in this demo.`,
-        tone: "warn",
-      });
-    },
-    [toast],
-  );
-
-  const value = useMemo<ForgeContextValue>(
-    () => ({
-      theme,
-      screen,
-      sidebarOpen,
-      sidebarCollapsed,
-      artifactOpen,
-      conversations,
-      activeId,
-      conv,
-      composer,
-      generating,
-      toasts,
-      setScreen: (s) => {
-        setScreen(s);
-        setSidebarOpen(false);
-      },
-      setSidebarOpen,
-      setSidebarCollapsed,
-      setArtifactOpen,
-      setComposer,
-      toggleTheme,
-      newProject,
-      openConversation,
-      sendChat,
-      confirmBrief,
-      markAssumption,
-      selectThesis,
-      lockThesis,
-      buildPrototype,
-      openArtifact,
-      copySpec,
-      copyPrototype,
-      toast,
-      dismissToast,
-      later,
-    }),
-    [
-      theme,
-      screen,
-      sidebarOpen,
-      sidebarCollapsed,
-      artifactOpen,
-      conversations,
-      activeId,
-      conv,
-      composer,
-      generating,
-      toasts,
-      toggleTheme,
-      newProject,
-      openConversation,
-      sendChat,
-      confirmBrief,
-      markAssumption,
-      selectThesis,
-      lockThesis,
-      buildPrototype,
-      openArtifact,
-      copySpec,
-      copyPrototype,
-      toast,
-      dismissToast,
-      later,
-    ],
-  );
+  const value = useMemo<ForgeContextValue>(() => ({
+    theme, screen, sidebarOpen, sidebarCollapsed, artifactOpen, conversations, activeId, conv, composer, generating, toasts,
+    setScreen: (s) => { setScreen(s); setSidebarOpen(false); },
+    setSidebarOpen, setSidebarCollapsed, setArtifactOpen, setComposer, toggleTheme, newProject, openConversation, sendChat,
+    confirmBrief, markAssumption, selectThesis, lockThesis, buildPrototype, openArtifact, copySpec, copyPrototype, toast, dismissToast, later,
+  }), [theme, screen, sidebarOpen, sidebarCollapsed, artifactOpen, conversations, activeId, conv, composer, generating, toasts, toggleTheme, newProject, openConversation, sendChat, confirmBrief, markAssumption, selectThesis, lockThesis, buildPrototype, openArtifact, copySpec, copyPrototype, toast, dismissToast, later]);
 
   return <ForgeContext.Provider value={value}>{children}</ForgeContext.Provider>;
 }
