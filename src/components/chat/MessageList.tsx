@@ -8,9 +8,7 @@ import type { ArtifactKind, ChatMessage } from "../../types";
 export function MessageList({ messages }: { messages: ChatMessage[] }) {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-8 px-4 py-8">
-      {messages.map((m) => (
-        <Message key={m.id} message={m} />
-      ))}
+      {messages.map((m) => <Message key={m.id} message={m} />)}
     </div>
   );
 }
@@ -21,12 +19,10 @@ function Message({ message }: { message: ChatMessage }) {
 
   return (
     <article className="flex gap-3">
-      <div
-        className={cn(
-          "mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold",
-          isUser ? "bg-inset text-ink-2" : "bg-spark-soft text-spark",
-        )}
-      >
+      <div className={cn(
+        "mt-0.5 grid size-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold",
+        isUser ? "bg-inset text-ink-2" : "bg-spark-soft text-spark",
+      )}>
         {isUser ? "Y" : "F"}
       </div>
       <div className="min-w-0 flex-1">
@@ -37,7 +33,14 @@ function Message({ message }: { message: ChatMessage }) {
         {isUser ? (
           <p className="whitespace-pre-wrap text-pretty text-[15px] leading-7 text-ink">{message.text}</p>
         ) : message.streaming && !message.text ? (
-          <p className="text-[13px] text-ink-4">Thinking through the decision…</p>
+          <div className="flex items-center gap-2 py-1 text-[13px] text-ink-4" aria-live="polite">
+            <span>Thinking through what changes the product decision</span>
+            <span className="flex gap-1">
+              <i className="size-1.5 animate-pulse rounded-full bg-spark" />
+              <i className="size-1.5 animate-pulse rounded-full bg-spark [animation-delay:120ms]" />
+              <i className="size-1.5 animate-pulse rounded-full bg-spark [animation-delay:240ms]" />
+            </span>
+          </div>
         ) : (
           <Prose text={message.text} />
         )}
@@ -50,11 +53,8 @@ function Message({ message }: { message: ChatMessage }) {
             {message.artifact === "thesis" && <Lock className="size-3.5 text-molten" />}
             {message.artifact === "spec" && <PanelsTopLeft className="size-3.5 text-temper" />}
             {message.artifact === "prototype" && <AppWindow className="size-3.5 text-temper" />}
-            Open {message.artifact === "brief" ? "working model" : message.artifact === "thesis" ? "product directions" : message.artifact === "prototype" ? "prototype" : "spec"}
+            Open {message.artifact === "brief" ? "decision brief" : message.artifact === "thesis" ? "product directions" : message.artifact === "prototype" ? "prototype" : "spec"}
           </button>
-        )}
-        {f.generating && message.streaming && (
-          <span className="mt-2 inline-block h-3 w-1.5 animate-pulse bg-spark" />
         )}
       </div>
     </article>

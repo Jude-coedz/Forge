@@ -1,6 +1,6 @@
 import type { Conversation } from "../types";
 
-export type ForgeTurnMode = "chat" | "lock-thesis" | "prototype";
+export type ForgeTurnMode = "chat" | "directions" | "lock-thesis" | "prototype";
 
 export interface ForgeReasoningProvider {
   readonly name: string;
