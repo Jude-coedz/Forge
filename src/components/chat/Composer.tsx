@@ -1,5 +1,5 @@
-import { ArrowUp, Mic, Paperclip } from "lucide-react";
-import { type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { ArrowUp } from "lucide-react";
+import { type FormEvent, type KeyboardEvent } from "react";
 import { cn } from "../../lib/cn";
 import { useForge } from "../../store/ForgeContext";
 
@@ -20,41 +20,28 @@ export function Composer({ autoFocus, large }: { autoFocus?: boolean; large?: bo
 
   return (
     <form onSubmit={submit} className="w-full">
-      <div
-        className={cn(
-          "rounded-2xl border border-line-strong bg-raised shadow-[var(--shadow-float)]",
-          large && "rounded-3xl",
-        )}
-      >
+      <div className={cn("rounded-2xl border border-line-strong bg-raised shadow-[var(--shadow-float)]", large && "rounded-3xl")}>
+        {!large && <p className="px-4 pt-3 text-[11px] font-medium text-ink-4">{composerLabel(f.conv?.phase)}</p>}
         <textarea
           autoFocus={autoFocus}
           rows={large ? 4 : 2}
           value={f.composer}
           onChange={(e) => f.setComposer(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Paste notes, a transcript, or a WhatsApp thread…"
+          placeholder={composerPlaceholder(f.conv?.phase, large)}
           className={cn(
-            "w-full resize-none bg-transparent px-4 pt-3 text-[15px] outline-none placeholder:text-ink-4",
-            large ? "min-h-[96px]" : "min-h-[52px]",
+            "w-full resize-none bg-transparent px-4 text-[15px] outline-none placeholder:text-ink-4",
+            large ? "min-h-[96px] pt-3" : "min-h-[52px] pt-1.5",
           )}
         />
-        <div className="flex items-center justify-between px-2 pb-2">
-          <div className="flex gap-0.5">
-            <IconHint
-              label="Attach"
-              onClick={() => f.later("File upload")}
-            >
-              <Paperclip className="size-4" />
-            </IconHint>
-            <IconHint label="Voice" onClick={() => f.later("Voice capture")}>
-              <Mic className="size-4" />
-            </IconHint>
-          </div>
+        <div className="flex items-center justify-between px-3 pb-2">
+          <span className="text-[10px] text-ink-4">Enter to send · Shift+Enter for a new line</span>
           <button
             type="submit"
             disabled={!f.composer.trim() || f.generating}
             className="grid size-8 place-items-center rounded-full bg-spark text-white disabled:opacity-30"
-            aria-label="Send"
+            aria-label="Send message"
+            title={f.generating ? "Forge is still thinking" : "Send to Forge"}
           >
             <ArrowUp className="size-4" />
           </button>
@@ -64,23 +51,17 @@ export function Composer({ autoFocus, large }: { autoFocus?: boolean; large?: bo
   );
 }
 
-function IconHint({
-  children,
-  label,
-  onClick,
-}: {
-  children: ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      title={`${label} — later`}
-      onClick={onClick}
-      className="grid size-8 place-items-center rounded-lg text-ink-4 hover:bg-inset hover:text-ink"
-    >
-      {children}
-    </button>
-  );
+function composerLabel(phase?: string) {
+  if (phase === "position") return "Discuss or challenge the product directions";
+  if (phase === "spec") return "Question or refine the spec";
+  if (phase === "prototype") return "Give feedback on the prototype";
+  return "Answer Forge or add more evidence";
+}
+
+function composerPlaceholder(phase?: string, large?: boolean) {
+  if (large) return "Describe the problem, what you observed, who experiences it, or paste messy notes…";
+  if (phase === "position") return "e.g. I think this should sit beside WhatsApp because…";
+  if (phase === "spec") return "e.g. This requirement feels too broad because…";
+  if (phase === "prototype") return "e.g. This flow doesn't match how photographers actually work…";
+  return "Answer the question in your own words, correct Forge, or add more context…";
 }
