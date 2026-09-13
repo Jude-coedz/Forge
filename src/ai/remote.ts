@@ -1,27 +1,42 @@
-import { AIProviderError, type ProductAnalysisProvider } from "./provider";
+import type { Conversation } from "../types";
+import { AIProviderError, type ForgeReasoningProvider, type ForgeTurnMode } from "./provider";
 
-export class RemoteAnalysisProvider implements ProductAnalysisProvider {
+function compactConversation(conversation: Conversation) {
+  return {
+    phase: conversation.phase,
+    productName: conversation.productName,
+    sources: conversation.sources,
+    brief: conversation.brief,
+    questions: conversation.questions,
+    theses: conversation.theses,
+    selectedThesis: conversation.selectedThesis,
+    thesisLocked: conversation.thesisLocked,
+    spec: conversation.spec,
+    messages: conversation.messages.slice(-14).map(({ role, text }) => ({ role, text })),
+  };
+}
+
+export class RemoteReasoningProvider implements ForgeReasoningProvider {
   readonly name = "forge-api";
 
-  constructor(private readonly endpoint = "/api/forge/analyze") {}
+  constructor(private readonly endpoint = "/api/forge/turn") {}
 
-  async analyzeSource(source: string, signal?: AbortSignal): Promise<unknown> {
+  async runTurn(conversation: Conversation, message: string, mode: ForgeTurnMode = "chat", signal?: AbortSignal) {
     let response: Response;
-
     try {
       response = await fetch(this.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal,
-        body: JSON.stringify({ source }),
+        body: JSON.stringify({ mode, message, conversation: compactConversation(conversation) }),
       });
     } catch {
-      throw new AIProviderError("Could not reach the Forge analysis API.");
+      throw new AIProviderError("Could not reach Forge's reasoning service.");
     }
 
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      throw new AIProviderError(payload?.error || `Forge analysis failed with status ${response.status}.`);
+      throw new AIProviderError(payload?.error || `Forge reasoning failed with status ${response.status}.`);
     }
 
     return response.json();

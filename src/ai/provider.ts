@@ -1,6 +1,10 @@
-export interface ProductAnalysisProvider {
+import type { Conversation } from "../types";
+
+export type ForgeTurnMode = "chat" | "lock-thesis" | "prototype";
+
+export interface ForgeReasoningProvider {
   readonly name: string;
-  analyzeSource(source: string, signal?: AbortSignal): Promise<unknown>;
+  runTurn(conversation: Conversation, message: string, mode?: ForgeTurnMode, signal?: AbortSignal): Promise<unknown>;
 }
 
 export class AIProviderError extends Error {
