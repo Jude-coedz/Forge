@@ -1,7 +1,7 @@
 import { Menu, Moon, PanelRight, Sun } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useForge } from "../../store/ForgeContext";
-import { ArtifactPane } from "../artifacts/ArtifactPane";
+import { ArtifactDrawer } from "../artifacts/ArtifactDrawer";
 import { Welcome } from "../chat/Welcome";
 import { SettingsView } from "../pages/SettingsView";
 import { Button } from "../ui/primitives";
@@ -26,7 +26,7 @@ export function AppShell() {
             <div className="flex min-h-0 flex-1">
               <ProductWorkspace />
               <CopilotPanel />
-              <ArtifactPane />
+              <ArtifactDrawer />
             </div>
           )}
         </div>
@@ -65,7 +65,7 @@ function TopBar() {
           variant="ghost"
           className={cn(f.artifactOpen && "bg-inset")}
           onClick={() => f.setArtifactOpen(!f.artifactOpen)}
-          aria-label="Toggle artifact"
+          aria-label="Toggle output"
           title="Open current build output"
         >
           <PanelRight className="size-4" />
@@ -79,7 +79,7 @@ function Toasts() {
   const { toasts, dismissToast } = useForge();
   if (!toasts.length) return null;
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-80 max-w-[calc(100%-2rem)] flex-col gap-2">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[70] flex w-80 max-w-[calc(100%-2rem)] flex-col gap-2">
       {toasts.map((t) => (
         <button
           key={t.id}
