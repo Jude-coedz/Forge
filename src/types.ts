@@ -36,6 +36,14 @@ export type ProductQuestion = {
   answer?: string;
 };
 
+export type DiscoveryReadiness = {
+  userKnown: boolean;
+  painObserved: boolean;
+  currentBehaviorKnown: boolean;
+  stakesKnown: boolean;
+  riskiestUnknown: string;
+};
+
 export type ThesisOption = {
   id: ThesisId;
   title: string;
@@ -93,6 +101,7 @@ export type Conversation = {
   sources: string[];
   brief: BriefItem[];
   questions: ProductQuestion[];
+  readiness: DiscoveryReadiness;
   theses: ThesisOption[];
   selectedThesis: ThesisId;
   thesisLocked: boolean;
