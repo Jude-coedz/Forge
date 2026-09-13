@@ -1,17 +1,6 @@
-export type AIMessage = {
-  role: "system" | "user" | "assistant";
-  content: string;
-};
-
-export type GenerateJSONOptions = {
-  messages: AIMessage[];
-  temperature?: number;
-  signal?: AbortSignal;
-};
-
-export interface AIProvider {
+export interface ProductAnalysisProvider {
   readonly name: string;
-  generateJSON<T>(options: GenerateJSONOptions): Promise<T>;
+  analyzeSource(source: string, signal?: AbortSignal): Promise<unknown>;
 }
 
 export class AIProviderError extends Error {
