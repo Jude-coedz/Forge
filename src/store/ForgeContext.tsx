@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { applyTurn, buildSpec, displayName, specToMarkdown } from "../lib/engine";
+import { analyzeProductSource } from "../ai/forge";
+import { applyTurn, buildSpec, displayName, specToMarkdown, type Turn } from "../lib/engine";
 import { generatePrototype } from "../lib/prototype";
 import { uid } from "../lib/id";
 import type {
@@ -78,6 +79,14 @@ function loadActiveId(conversations: Conversation[]) {
     /* ignore */
   }
   return null;
+}
+
+function shouldUseAI(conv: Conversation, turn: Turn) {
+  return conv.phase === "idle" && turn.artifact === "brief" && turn.patch.phase === "brief";
+}
+
+function aiBriefReply(productName: string, whyRecommended: string) {
+  return `I pulled a working brief out of that and separated what you actually gave me from what still needs validation.\n\n**${productName}** is only a working name. Nothing is locked yet.\n\nI also surfaced the questions you have not answered yet — those matter more than another feature list.\n\n${whyRecommended}\n\nCheck the brief, challenge the assumptions, then we will make the product-category decision. I will not write a spec until that decision is locked.`;
 }
 
 type ForgeContextValue = {
@@ -161,9 +170,12 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     setToasts((prev) => prev.filter((x) => x.id !== id));
   }, []);
 
-  const patchActive = useCallback((fn: (c: Conversation) => Conversation) => {
-    setConversations((list) => list.map((c) => (c.id === activeId ? fn({ ...c, updatedAt: Date.now() }) : c)));
-  }, [activeId]);
+  const patchActive = useCallback(
+    (fn: (c: Conversation) => Conversation) => {
+      setConversations((list) => list.map((c) => (c.id === activeId ? fn({ ...c, updatedAt: Date.now() }) : c)));
+    },
+    [activeId],
+  );
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
@@ -194,64 +206,61 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     setSidebarOpen(false);
   }, []);
 
-  const streamReply = useCallback(
-    (conversationId: string, full: string, artifact?: ArtifactKind) => {
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const assistant: ChatMessage = {
-        id: uid(),
-        role: "assistant",
-        text: reduce ? full : "",
-        createdAt: Date.now(),
-        artifact,
-        streaming: !reduce,
-      };
-      setConversations((list) =>
-        list.map((c) => (c.id === conversationId ? { ...c, messages: [...c.messages, assistant] } : c)),
-      );
-      if (reduce) {
-        setGenerating(false);
-        return;
-      }
-      const parts = full.split(/(\s+)/);
-      let i = 0;
-      let acc = "";
-      const tick = () => {
-        if (i >= parts.length) {
-          setConversations((list) =>
-            list.map((c) =>
-              c.id === conversationId
-                ? {
-                    ...c,
-                    messages: c.messages.map((m) => (m.id === assistant.id ? { ...m, text: full, streaming: false } : m)),
-                  }
-                : c,
-            ),
-          );
-          setGenerating(false);
-          return;
-        }
-        acc += parts[i++];
-        const snapshot = acc;
+  const streamReply = useCallback((conversationId: string, full: string, artifact?: ArtifactKind) => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const assistant: ChatMessage = {
+      id: uid(),
+      role: "assistant",
+      text: reduce ? full : "",
+      createdAt: Date.now(),
+      artifact,
+      streaming: !reduce,
+    };
+    setConversations((list) =>
+      list.map((c) => (c.id === conversationId ? { ...c, messages: [...c.messages, assistant] } : c)),
+    );
+    if (reduce) {
+      setGenerating(false);
+      return;
+    }
+    const parts = full.split(/(\s+)/);
+    let i = 0;
+    let acc = "";
+    const tick = () => {
+      if (i >= parts.length) {
         setConversations((list) =>
           list.map((c) =>
             c.id === conversationId
               ? {
                   ...c,
-                  messages: c.messages.map((m) => (m.id === assistant.id ? { ...m, text: snapshot } : m)),
+                  messages: c.messages.map((m) => (m.id === assistant.id ? { ...m, text: full, streaming: false } : m)),
                 }
               : c,
           ),
         );
-        const delay = /\n/.test(parts[i - 1] ?? "") ? 28 : 10;
-        timers.current.push(window.setTimeout(tick, delay));
-      };
-      timers.current.push(window.setTimeout(tick, 240));
-    },
-    [],
-  );
+        setGenerating(false);
+        return;
+      }
+      acc += parts[i++];
+      const snapshot = acc;
+      setConversations((list) =>
+        list.map((c) =>
+          c.id === conversationId
+            ? {
+                ...c,
+                messages: c.messages.map((m) => (m.id === assistant.id ? { ...m, text: snapshot } : m)),
+              }
+            : c,
+        ),
+      );
+      const delay = /\n/.test(parts[i - 1] ?? "") ? 28 : 10;
+      timers.current.push(window.setTimeout(tick, delay));
+    };
+    timers.current.push(window.setTimeout(tick, 240));
+  }, []);
 
   const sendChat = useCallback(
-    (text?: string) => {
+    async (text?: string) => {
       const content = (text ?? composer).trim();
       if (!content || generating) return;
 
@@ -277,7 +286,47 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         messages: [...base.messages, userMsg],
         updatedAt: Date.now(),
       };
-      const result = applyTurn(working, content);
+
+      setComposer("");
+      setGenerating(true);
+      setConversations((list) => {
+        const exists = list.some((c) => c.id === conversationId);
+        if (!exists) return [working, ...list];
+        return list.map((c) => (c.id === conversationId ? working : c));
+      });
+
+      const fallback = applyTurn(working, content);
+      let result = fallback;
+
+      if (shouldUseAI(working, fallback)) {
+        try {
+          const analysis = await analyzeProductSource(content);
+          const selectedThesis = analysis.theses.find((thesis) => thesis.recommended)?.id ?? "B";
+          result = {
+            reply: aiBriefReply(analysis.productName, analysis.whyRecommended),
+            artifact: "brief",
+            patch: {
+              phase: "brief",
+              brief: analysis.brief,
+              theses: analysis.theses,
+              selectedThesis,
+              productName: analysis.productName,
+              title: analysis.productName,
+              sources: [...working.sources, content],
+              artifact: "brief",
+              spec: null,
+              thesisLocked: false,
+            },
+          };
+        } catch {
+          toast({
+            title: "Using local fallback",
+            body: "Forge could not reach Ollama, so this turn used the deterministic engine.",
+            tone: "warn",
+          });
+        }
+      }
+
       const patched: Conversation = {
         ...working,
         ...result.patch,
@@ -289,12 +338,10 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         if (!exists) return [patched, ...list];
         return list.map((c) => (c.id === conversationId ? patched : c));
       });
-      setComposer("");
-      setGenerating(true);
       if (result.artifact) setArtifactOpen(true);
       streamReply(conversationId, result.reply, result.artifact ?? undefined);
     },
-    [activeId, composer, conv, generating, streamReply],
+    [activeId, composer, conv, generating, streamReply, toast],
   );
 
   const confirmBrief = useCallback(
@@ -387,13 +434,16 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     );
   }, [conv, patchActive, streamReply, toast]);
 
-  const later = useCallback((feature: string) => {
-    toast({
-      title: "Later — not faked",
-      body: `${feature} is not in this demo.`,
-      tone: "warn",
-    });
-  }, [toast]);
+  const later = useCallback(
+    (feature: string) => {
+      toast({
+        title: "Later — not faked",
+        body: `${feature} is not in this demo.`,
+        tone: "warn",
+      });
+    },
+    [toast],
+  );
 
   const value = useMemo<ForgeContextValue>(
     () => ({

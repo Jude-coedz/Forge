@@ -1,108 +1,104 @@
 # Forge
 
-Forge is a product-engineering copilot for turning rough product ideas into something you can actually build.
+Forge is a product-thinking copilot that helps builders ask the questions they forget to ask themselves, sharpen their product thinking, and make better-informed decisions before they build.
 
-Instead of immediately generating a specification, Forge first forces the user to clarify the problem and make a product decision. It then generates a structured specification, identifies potential failure modes, and produces an interactive prototype.
+It does not jump straight from an idea to a feature list or generated app. Forge first separates evidence from assumptions, surfaces important unknowns, forces an explicit product-category decision, and only then produces a specification and prototype.
 
-## The Problem
-
-A lot of product ideas start as a collection of:
-
-* notes
-* conversations
-* feature requests
-* assumptions
-* half-formed ideas
-
-The temptation is to immediately start building.
-
-Forge is designed to slow down that first step and make the product decision explicit before implementation begins.
-
-## How It Works
+## How it works
 
 ```text
-Messy idea
-    ↓
-Problem framing
-    ↓
-Product decision
-    ↓
+Messy source material
+        ↓
+Evidence + assumptions
+        ↓
+Questions you have not answered yet
+        ↓
+Product-category options
+        ↓
+Locked product decision
+        ↓
 Structured specification
-    ↓
+        ↓
 Failure-mode analysis
-    ↓
+        ↓
 Interactive prototype
 ```
 
+The category lock is deliberate: Forge will not write the full specification until the builder has made the product decision.
+
 ## Architecture
 
-The application is built with Next.js, React, and TypeScript.
+Forge uses React, Vite, TypeScript, Tailwind CSS, and React Context. Model inference is hosted; no model runs on the user's machine.
 
 ```text
-UI
-│
-├── Conversation interface
-├── Product framing
-├── Specification view
-└── Prototype viewer
-        │
-        ↓
-Forge Context
-        │
-        ↓
-Product Engine
-        │
-        ├── Problem analysis
-        ├── Product decision
-        ├── Specification generation
-        └── Failure-mode analysis
-        │
-        ↓
-Prototype Generator
-        │
-        ↓
-Interactive HTML prototype
+React/Vite UI
+   │
+   ▼
+Forge Context + deterministic state machine
+   │
+   ├── fallback local reasoning
+   │
+   └── POST /api/forge/analyze
+              │
+              ▼
+        Cloudflare Worker
+              │
+              ▼
+       hosted Groq model
 ```
+
+The browser only sends product source material to Forge's own API. The model key and product-reasoning prompt stay server-side.
 
 ### Core modules
 
-* `src/lib/engine.ts` — core product reasoning and transformation logic
-* `src/lib/prototype.ts` — generates the interactive prototype
-* `src/types.ts` — shared application types
-* `ForgeContext.tsx` — application state and conversation flow
-* `components/` — UI components
+- `src/lib/engine.ts` — deterministic workflow, gates, fallback reasoning, and spec generation
+- `src/ai/provider.ts` — analysis-provider contract
+- `src/ai/remote.ts` — browser client for the Forge API
+- `src/ai/forge.ts` — normalization into Forge brief/thesis types
+- `worker/index.ts` — server-side AI endpoint
+- `src/lib/prototype.ts` — interactive prototype generator
+- `src/store/ForgeContext.tsx` — application state and conversation flow
 
-## Engineering Decisions
+## Engineering principles
 
-### Product framing before specification
+### Product thinking before implementation
 
-Forge does not allow a specification to be generated before the product category and framing decision are established.
+Forge should behave like a demanding product-thinking partner, not an agreeable feature generator. It should expose missing evidence, challenge assumptions, and force meaningful tradeoffs.
 
-This prevents the system from turning an unclear idea into a detailed specification for the wrong product.
+### Evidence is different from inference
 
-### Failure modes
+The model must not invent customer evidence. Missing information should remain missing and become an explicit question or assumption.
 
-Specifications include potential failure cases rather than only describing the ideal workflow.
+### The state machine owns the workflow
 
-### Local-first demo
+The model does not decide whether Forge can skip from an idea to a spec. The deterministic application state machine controls the gates; the model supplies structured reasoning inside those gates.
 
-The public demo currently uses a deterministic local engine rather than requiring a live model or API key.
+### Graceful fallback
 
-This keeps the demo reproducible and makes the core product logic easy to inspect.
+If hosted AI is unavailable, Forge falls back to the deterministic engine instead of breaking the product flow.
 
-## Running Locally
+## Local development
+
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Run the frontend:
+
+```bash
 npm run dev
 ```
 
-Then open the local development URL shown by Next.js.
+The Vite dev server proxies `/api` to a Worker running at `http://127.0.0.1:8787`.
 
-## Tech Stack
+For full local API testing, run a Cloudflare Worker dev process in a second terminal and provide the model key as a local Worker secret. The key must never use a `VITE_` prefix.
 
-* Next.js
-* React
-* TypeScript
-* Tailwind CSS
-* Zustand
+## Deployment target
+
+The intended zero-cost beta deployment is Cloudflare Workers + Static Assets. The Worker serves both the built React app and `/api/*`, and the hosted model key is configured as a Worker secret rather than committed to GitHub.
+
+## Status
+
+Forge is moving from a deterministic demo into a real reasoning system incrementally. V0.2 replaces simulated initial product analysis first while preserving the existing workflow and fallback engine.
