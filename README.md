@@ -4,22 +4,7 @@ Forge is a product-thinking copilot that helps builders ask the questions they f
 
 It does not jump straight from an idea to a feature list or generated app. Forge first separates evidence from assumptions, surfaces important unknowns, forces an explicit product-category decision, and only then produces a specification and prototype.
 
-## The Problem
-
-A lot of products start as a mix of:
-
-- notes
-- customer conversations
-- feature requests
-- assumptions
-- constraints
-- half-formed ideas
-
-The dangerous move is turning that ambiguity into implementation too quickly. A polished build can still be the wrong product.
-
-Forge is designed to improve the quality of the decisions that happen before implementation.
-
-## How It Works
+## How it works
 
 ```text
 Messy source material
@@ -41,35 +26,40 @@ Interactive prototype
 
 The category lock is deliberate: Forge will not write the full specification until the builder has made the product decision.
 
-## Current Architecture
+## Architecture
 
-Forge currently uses React, Vite, TypeScript, Tailwind CSS, and React Context.
+Forge uses React, Vite, TypeScript, Tailwind CSS, and React Context. Model inference is hosted; no model runs on the user's machine.
 
 ```text
-React UI
+React/Vite UI
    │
    ▼
-Forge Context
+Forge Context + deterministic state machine
    │
-   ├──────────────► deterministic state machine
-   │                 idle → brief → position → spec → prototype
+   ├── fallback local reasoning
    │
-   └──────────────► AI reasoning provider
-                     │
-                     └── Ollama (local, zero-cost development)
+   └── POST /api/forge/analyze
+              │
+              ▼
+        Cloudflare Worker
+              │
+              ▼
+       hosted Groq model
 ```
+
+The browser only sends product source material to Forge's own API. The model key and product-reasoning prompt stay server-side.
 
 ### Core modules
 
 - `src/lib/engine.ts` — deterministic workflow, gates, fallback reasoning, and spec generation
-- `src/ai/provider.ts` — model-provider contract
-- `src/ai/ollama.ts` — local Ollama JSON provider
-- `src/ai/forge.ts` — structured product-reasoning prompt and normalization
+- `src/ai/provider.ts` — analysis-provider contract
+- `src/ai/remote.ts` — browser client for the Forge API
+- `src/ai/forge.ts` — normalization into Forge brief/thesis types
+- `worker/index.ts` — server-side AI endpoint
 - `src/lib/prototype.ts` — interactive prototype generator
-- `src/types.ts` — shared application types
 - `src/store/ForgeContext.tsx` — application state and conversation flow
 
-## Engineering Principles
+## Engineering principles
 
 ### Product thinking before implementation
 
@@ -77,17 +67,17 @@ Forge should behave like a demanding product-thinking partner, not an agreeable 
 
 ### Evidence is different from inference
 
-The model is instructed not to invent customer evidence. Missing information should stay missing and become an explicit question or assumption.
+The model must not invent customer evidence. Missing information should remain missing and become an explicit question or assumption.
 
 ### The state machine owns the workflow
 
 The model does not decide whether Forge can skip from an idea to a spec. The deterministic application state machine controls the gates; the model supplies structured reasoning inside those gates.
 
-### Graceful local fallback
+### Graceful fallback
 
-If Ollama is unavailable, Forge falls back to the deterministic engine instead of breaking the product flow. This keeps development and the existing demo usable while AI functionality is expanded.
+If hosted AI is unavailable, Forge falls back to the deterministic engine instead of breaking the product flow.
 
-## Running Locally
+## Local development
 
 Install dependencies:
 
@@ -95,35 +85,20 @@ Install dependencies:
 npm install
 ```
 
-Install Ollama, then pull the default open-source model:
-
-```bash
-ollama pull qwen3:8b
-```
-
-Start Ollama, then run Forge:
+Run the frontend:
 
 ```bash
 npm run dev
 ```
 
-Vite proxies `/ollama` to `http://127.0.0.1:11434`, so local development does not require a paid model API or browser CORS configuration.
+The Vite dev server proxies `/api` to a Worker running at `http://127.0.0.1:8787`.
 
-To use another Ollama model, copy `.env.example` to `.env` and change:
+For full local API testing, run a Cloudflare Worker dev process in a second terminal and provide the model key as a local Worker secret. The key must never use a `VITE_` prefix.
 
-```bash
-VITE_OLLAMA_MODEL=qwen3:8b
-```
+## Deployment target
 
-## Tech Stack
-
-- React 19
-- Vite 7
-- TypeScript 5.9
-- Tailwind CSS 4
-- React Context
-- Ollama for local open-source model inference
+The intended zero-cost beta deployment is Cloudflare Workers + Static Assets. The Worker serves both the built React app and `/api/*`, and the hosted model key is configured as a Worker secret rather than committed to GitHub.
 
 ## Status
 
-Forge is moving from a deterministic product demo into a real reasoning system incrementally. The current implementation keeps the existing workflow intact while replacing simulated product analysis with structured model output first.
+Forge is moving from a deterministic demo into a real reasoning system incrementally. V0.2 replaces simulated initial product analysis first while preserving the existing workflow and fallback engine.
