@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { cn } from "../../lib/cn";
-import type { Confidence, Severity } from "../../types";
+import type { Severity } from "../../types";
 
 export function Button({
   variant = "primary",
@@ -14,14 +14,14 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-[transform,background-color,color,border-color,opacity] duration-150 ease-out enabled:active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none",
-        size === "sm" && "h-7 px-2.5 text-xs",
-        size === "md" && "h-8 px-3 text-[13px]",
-        size === "lg" && "h-10 px-4 text-sm",
-        size === "icon" && "size-8 p-0",
-        variant === "primary" && "bg-spark text-white hover:brightness-110",
-        variant === "temper" && "bg-temper text-white dark:text-canvas hover:brightness-110",
-        variant === "secondary" && "bg-raised border border-line-strong text-ink hover:bg-inset",
+        "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-[transform,background-color,color,border-color,opacity] duration-150 ease-out enabled:active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40",
+        size === "sm" && "h-8 px-3 text-[13px]",
+        size === "md" && "h-9 px-3.5 text-[14px]",
+        size === "lg" && "h-10 px-4 text-[14px]",
+        size === "icon" && "size-9 p-0",
+        variant === "primary" && "bg-ink text-canvas hover:opacity-90",
+        variant === "temper" && "bg-temper text-white dark:text-canvas hover:brightness-105",
+        variant === "secondary" && "border border-line-strong bg-raised text-ink hover:bg-inset",
         variant === "ghost" && "text-ink-2 hover:bg-inset hover:text-ink",
         variant === "danger" && "bg-scorch-soft text-scorch hover:bg-scorch hover:text-white",
         className,
@@ -43,7 +43,7 @@ export function Pill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium tabular-nums",
         tone === "default" && "bg-inset text-ink-2",
         tone === "spark" && "bg-spark-soft text-spark",
         tone === "temper" && "bg-temper-soft text-temper",
@@ -57,12 +57,6 @@ export function Pill({
   );
 }
 
-export function ConfidenceChip({ value }: { value: Confidence }) {
-  if (value === "high") return <Pill tone="temper">High</Pill>;
-  if (value === "medium") return <Pill tone="molten">Medium</Pill>;
-  return <Pill tone="molten">Assumption</Pill>;
-}
-
 export function SeverityBadge({ value }: { value: Severity }) {
   const map: Record<Severity, { tone: "scorch" | "molten" | "default"; label: string }> = {
     critical: { tone: "scorch", label: "Critical" },
@@ -70,8 +64,8 @@ export function SeverityBadge({ value }: { value: Severity }) {
     medium: { tone: "molten", label: "Medium" },
     low: { tone: "default", label: "Low" },
   };
-  const m = map[value];
-  return <Pill tone={m.tone}>{m.label}</Pill>;
+  const item = map[value];
+  return <Pill tone={item.tone}>{item.label}</Pill>;
 }
 
 export function ForgeMark({ className }: { className?: string }) {
@@ -93,22 +87,5 @@ export function ForgeMark({ className }: { className?: string }) {
         strokeLinecap="round"
       />
     </svg>
-  );
-}
-
-export function Prose({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return (
-    <p className="whitespace-pre-wrap text-pretty text-[15px] leading-7 text-ink-2">
-      {parts.map((part, i) =>
-        part.startsWith("**") && part.endsWith("**") ? (
-          <strong key={i} className="font-semibold text-ink">
-            {part.slice(2, -2)}
-          </strong>
-        ) : (
-          <span key={i}>{part}</span>
-        ),
-      )}
-    </p>
   );
 }
