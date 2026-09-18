@@ -1,53 +1,26 @@
 import type { Conversation } from "../types";
 import { AIProviderError, type ForgeReasoningProvider, type ForgeTurnMode } from "./provider";
 
-const PRODUCT_GUIDE = [
-  "Treat chat as input to a durable product model, not as the product itself.",
-  "Separate customer opportunities from solution ideas.",
-  "Prefer concrete behavior and outcomes over opinions.",
-  "Preserve evidence, assumptions, open decisions, and why decisions were made.",
-  "Reduce the riskiest assumption across value, usability, feasibility, and viability.",
-  "If the user cannot answer a question, convert the unknown into a validation task instead of blocking progress.",
-];
-
 function compactConversation(conversation: Conversation, mode: ForgeTurnMode) {
   const base = {
-    phase: conversation.phase,
     productName: conversation.productName,
-    productGuide: PRODUCT_GUIDE,
+    stage: conversation.stage,
     productModel: conversation.productModel,
-    questions: conversation.questions,
     theses: conversation.theses,
     selectedThesis: conversation.selectedThesis,
     thesisLocked: conversation.thesisLocked,
   };
 
-  if (mode === "prototype") {
-    return {
-      ...base,
-      spec: conversation.spec,
-      messages: conversation.messages.slice(-3).map(({ role, text }) => ({ role, text })),
-    };
-  }
-
-  if (mode === "eval") {
-    return {
-      ...base,
-      spec: conversation.spec,
-      prototype: conversation.prototype,
-    };
-  }
-
   if (mode === "lock-thesis") {
     return {
       ...base,
-      messages: conversation.messages.slice(-5).map(({ role, text }) => ({ role, text })),
+      recentMessages: conversation.messages.slice(-4).map(({ role, text }) => ({ role, text })),
     };
   }
 
   return {
     ...base,
-    messages: conversation.messages.slice(-6).map(({ role, text }) => ({ role, text })),
+    recentMessages: conversation.messages.slice(-4).map(({ role, text }) => ({ role, text })),
   };
 }
 
@@ -59,7 +32,7 @@ function transient(status: number) {
   return status === 429 || status === 502 || status === 503 || status === 504;
 }
 
-const RETRY_DELAYS = [700, 1600, 3200];
+const RETRY_DELAYS = [800, 1800, 3600];
 
 export class RemoteReasoningProvider implements ForgeReasoningProvider {
   readonly name = "forge-api";
@@ -67,7 +40,7 @@ export class RemoteReasoningProvider implements ForgeReasoningProvider {
   constructor(private readonly endpoint = "/api/forge/turn") {}
 
   async runTurn(conversation: Conversation, message: string, mode: ForgeTurnMode = "chat", signal?: AbortSignal) {
-    let lastError = "Could not reach Forge's reasoning service.";
+    let lastError = "Forge could not reach its reasoning service.";
 
     for (let attempt = 0; attempt < RETRY_DELAYS.length + 1; attempt += 1) {
       let response: Response;
@@ -94,6 +67,7 @@ export class RemoteReasoningProvider implements ForgeReasoningProvider {
         await wait(RETRY_DELAYS[attempt]);
         continue;
       }
+
       throw new AIProviderError(lastError);
     }
 
