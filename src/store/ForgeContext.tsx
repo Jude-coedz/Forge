@@ -410,7 +410,8 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         `I choose ${thesis.title}. Lock this direction and create the concise Build Brief.`,
         "lock-thesis",
       );
-      if (!result.spec) throw new Error("Build brief was missing.");
+      const spec = result.spec;
+      if (!spec) throw new Error("Build brief was missing.");
 
       setConversations((list) => list.map((item) => item.id === conv.id ? {
         ...item,
@@ -418,7 +419,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         productModel: result.productModel ?? item.productModel,
         theses: result.theses ?? item.theses,
         thesisLocked: true,
-        spec: result.spec,
+        spec,
         stage: "brief",
         updatedAt: Date.now(),
       } : item));
