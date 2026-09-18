@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ArrowLeft, Check, ClipboardCopy, FileText, Plus } from "lucide-react";
 import { builderPrompt } from "../../lib/format";
 import { useForge } from "../../store/ForgeContext";
@@ -98,7 +99,7 @@ function ActionRow({
   action,
   onClick,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   body: string;
   action: string;
