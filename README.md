@@ -1,81 +1,162 @@
 # Forge
 
-Forge is a product-thinking copilot that helps builders ask the questions they forget to ask themselves, sharpen their product thinking, and make better-informed decisions before they build.
+Forge is a guided pre-build product copilot.
 
-It does not jump straight from an idea to a feature list or generated app. Forge first separates evidence from assumptions, surfaces important unknowns, forces an explicit product-category decision, and only then produces a specification and prototype.
+Its job is simple: help a builder turn a messy idea into a defensible product direction and a focused build brief **before** they start building.
 
-## How it works
+Forge is not a general PM chatbot, a PRD generator, or an AI app builder. Chat is a supporting correction surface. The primary product is a short guided workflow that progressively turns ambiguity into a decision.
+
+## Product promise
+
+> When you have a rough product idea, Forge helps you decide what is worth building and turns that decision into a build-ready brief without making you pretend every assumption is proven.
+
+## Core user
+
+Solo builders and early-stage product people working on 0→1 products, especially when AI coding tools make it easy to start implementation before the product decision is clear.
+
+## Primary workflow
 
 ```text
-Messy source material
-        ↓
-Evidence + assumptions
-        ↓
-Questions you have not answered yet
-        ↓
-Product-category options
-        ↓
-Locked product decision
-        ↓
-Structured specification
-        ↓
-Failure-mode analysis
-        ↓
-Interactive prototype
+Home
+  ↓
+Frame
+  ↓
+Challenge
+  ↓
+Decide
+  ↓
+Build Brief
+  ↓
+Handoff
 ```
 
-The category lock is deliberate: Forge will not write the full specification until the builder has made the product decision.
+### Frame
+
+Forge synthesizes the user's rough input into:
+
+- primary user
+- problem / opportunity
+- current workaround
+- desired outcome
+- explicit assumptions
+
+The user corrects the frame only when needed.
+
+### Challenge
+
+Forge surfaces the small number of assumptions or open decisions that could materially change what gets built.
+
+Unknown is a valid state. The user can leave something unresolved and continue.
+
+### Decide
+
+Forge generates three materially different product directions and recommends one. The user chooses the direction.
+
+### Build Brief
+
+Forge creates a concise handoff containing:
+
+- chosen direction
+- focused V1
+- must-have requirements
+- explicit non-goals
+- acceptance criteria
+- important failure modes
+- validation work
+- success signals
+- unresolved questions
+
+### Handoff
+
+The user copies either the full build brief or a compact builder prompt for the implementation tool of their choice.
+
+## Product principles
+
+### One screen, one primary task
+
+Every stage should answer:
+
+- Where am I?
+- What do I need to do?
+- Why does it matter?
+- What happens next?
+
+Forge uses progressive disclosure rather than exposing its full internal product model on every screen.
+
+### The model is internal memory
+
+Forge maintains a structured Product Model containing:
+
+- user
+- opportunity
+- workaround
+- desired outcome
+- evidence
+- assumptions
+- decisions
+- validation tasks
+
+Users should benefit from that structure without having to manage it directly.
+
+### Evidence is not assumption
+
+Forge must not invent customer evidence, market facts, frequency, willingness to pay, or numeric certainty. Unknown information remains unknown.
+
+### Corrections invalidate stale outputs
+
+If a correction materially changes the product frame, downstream directions and build briefs are cleared rather than silently becoming inconsistent.
+
+### AI should interpret, not own deterministic state
+
+Application state such as the current project stage, selected direction, project title, and completion state is owned by the client. AI is used for synthesis, comparison, critique, and structured product reasoning.
 
 ## Architecture
 
-Forge uses React, Vite, TypeScript, Tailwind CSS, and React Context. Model inference is hosted; no model runs on the user's machine.
-
 ```text
-React/Vite UI
-   │
-   ▼
-Forge Context + deterministic state machine
-   │
-   ├── fallback local reasoning
-   │
-   └── POST /api/forge/analyze
-              │
-              ▼
-        Cloudflare Worker
-              │
-              ▼
-       hosted Groq model
+React / Vite / TypeScript
+        │
+        ▼
+Forge Context
+explicit project stage + persisted product state
+        │
+        ▼
+POST /api/forge/turn
+        │
+        ▼
+Cloudflare Worker
+server-side product reasoning prompt
+        │
+        ▼
+Groq hosted model
 ```
-
-The browser only sends product source material to Forge's own API. The model key and product-reasoning prompt stay server-side.
 
 ### Core modules
 
-- `src/lib/engine.ts` — deterministic workflow, gates, fallback reasoning, and spec generation
-- `src/ai/provider.ts` — analysis-provider contract
-- `src/ai/remote.ts` — browser client for the Forge API
-- `src/ai/forge.ts` — normalization into Forge brief/thesis types
-- `worker/index.ts` — server-side AI endpoint
-- `src/lib/prototype.ts` — interactive prototype generator
-- `src/store/ForgeContext.tsx` — application state and conversation flow
+- `src/store/ForgeContext.tsx` — project persistence, explicit workflow state, AI actions
+- `src/components/flow/` — focused workflow screens
+- `src/components/workspace/CopilotPanel.tsx` — optional correction / challenge drawer
+- `src/ai/remote.ts` — compact browser-to-Worker reasoning requests and transient retries
+- `src/ai/forge.ts` — normalization of structured model output
+- `worker/index.ts` — server-side reasoning contract and strict structured outputs
+- `src/lib/format.ts` — build brief and builder-prompt formatting
 
-## Engineering principles
+## Persistence and re-entry
 
-### Product thinking before implementation
+Projects are currently saved in browser localStorage.
 
-Forge should behave like a demanding product-thinking partner, not an agreeable feature generator. It should expose missing evidence, challenge assumptions, and force meaningful tradeoffs.
+A fresh visit always opens Forge Home. Saved projects remain in the sidebar and only reopen when the user explicitly selects one.
 
-### Evidence is different from inference
+Each saved project persists its current workflow stage, so reopening a project restores meaningful progress instead of reconstructing it from UI history.
 
-The model must not invent customer evidence. Missing information should remain missing and become an explicit question or assumption.
+## AI modes
 
-### The state machine owns the workflow
+Forge deliberately has only three reasoning modes:
 
-The model does not decide whether Forge can skip from an idea to a spec. The deterministic application state machine controls the gates; the model supplies structured reasoning inside those gates.
+1. **chat** — update / challenge the working product frame
+2. **directions** — compare three product directions
+3. **lock-thesis** — turn the chosen direction into the Build Brief
 
-### Graceful fallback
-
-If hosted AI is unavailable, Forge falls back to the deterministic engine instead of breaking the product flow.
+This keeps model usage aligned with the product journey and avoids unnecessary calls.
 
 ## Local development
 
@@ -93,12 +174,20 @@ npm run dev
 
 The Vite dev server proxies `/api` to a Worker running at `http://127.0.0.1:8787`.
 
-For full local API testing, run a Cloudflare Worker dev process in a second terminal and provide the model key as a local Worker secret. The key must never use a `VITE_` prefix.
+For full local API testing, run the Cloudflare Worker dev process separately and configure `GROQ_API_KEY` as a Worker secret. Never expose the key through a `VITE_` variable.
 
-## Deployment target
+## Production
 
-The intended zero-cost beta deployment is Cloudflare Workers + Static Assets. The Worker serves both the built React app and `/api/*`, and the hosted model key is configured as a Worker secret rather than committed to GitHub.
+Forge is deployed with Cloudflare Workers + Static Assets.
 
-## Status
+- Worker name: `forge`
+- Production branch: `main`
+- API route: `/api/forge/turn`
+- Hosted model: configured by `GROQ_MODEL`
+- Secret: `GROQ_API_KEY`
 
-Forge is moving from a deterministic demo into a real reasoning system incrementally. V0.2 replaces simulated initial product analysis first while preserving the existing workflow and fallback engine.
+## Definition of done
+
+A first-time user should be able to open Forge, describe a rough idea, understand each step without explanation from the founder, make a product decision, and leave with a build-ready brief.
+
+If the workflow needs another dashboard, another persistent panel, or another explanation of how Forge itself works, simplify before adding features.
