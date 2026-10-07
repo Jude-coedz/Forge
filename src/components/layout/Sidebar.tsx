@@ -38,7 +38,7 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col border-r border-line bg-canvas transition-transform duration-200 md:static md:z-0 md:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-[236px] flex-col border-r border-line bg-canvas transition-transform duration-200 md:static md:z-0 md:translate-x-0",
           f.sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
       >
@@ -61,7 +61,7 @@ export function Sidebar() {
               f.newProject();
               setMenuId(null);
             }}
-            className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium text-ink-2 transition hover:bg-inset hover:text-ink"
+            className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-[14px] font-medium text-ink-2 transition hover:bg-inset hover:text-ink"
           >
             <Plus className="size-4" />
             New idea
@@ -69,7 +69,7 @@ export function Sidebar() {
         </div>
 
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-2.5 scrollbar-thin">
-          <p className="px-2.5 pb-2 text-[11px] font-medium text-ink-4">Projects</p>
+          <p className="px-2.5 pb-2 text-[12px] font-medium text-ink-4">Projects</p>
 
           {projects.length === 0 && (
             <p className="px-2.5 text-[12px] leading-5 text-ink-4">
@@ -119,7 +119,7 @@ export function Sidebar() {
                     ) : (
                       <button
                         type="button"
-                        className="min-w-0 flex-1 truncate text-left text-[12px] font-medium"
+                        className="min-w-0 flex-1 truncate text-left text-[14px] font-medium"
                         onClick={() => {
                           f.openConversation(project.id);
                           setMenuId(null);
@@ -196,9 +196,6 @@ export function Sidebar() {
           </div>
         </div>
 
-        <div className="border-t border-line px-4 py-3">
-          <p className="text-[11px] leading-5 text-ink-4">Your current work is saved in this browser.</p>
-        </div>
       </aside>
     </>
   );
