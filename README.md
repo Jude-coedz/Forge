@@ -27,6 +27,8 @@ Decide
   ↓
 Build Brief
   ↓
+Prototype
+  ↓
 Handoff
 ```
 
@@ -66,9 +68,13 @@ Forge creates a concise handoff containing:
 - success signals
 - unresolved questions
 
+### Prototype
+
+Forge turns the locked Build Brief into a self-contained interactive HTML prototype. The prototype is generated from the chosen V1, runs in a sandboxed preview, and is cleared whenever upstream product decisions change.
+
 ### Handoff
 
-The user copies either the full build brief or a compact builder prompt for the implementation tool of their choice.
+The user leaves with the full Build Brief, a compact builder prompt, and the working prototype HTML so the product decision and the implementation artifact stay connected.
 
 ## Product principles
 
@@ -137,7 +143,8 @@ Google Gemini model
 - `src/components/workspace/CopilotPanel.tsx` — optional correction / challenge drawer
 - `src/ai/remote.ts` — compact browser-to-Worker reasoning requests and transient retries
 - `src/ai/forge.ts` — normalization of structured model output
-- `worker/index.ts` — server-side reasoning contract and strict structured outputs
+- `worker/index.ts` — server-side Gemini reasoning contract and strict structured outputs
+- `src/components/flow/PrototypeScreen.tsx` — sandboxed desktop/mobile prototype workspace
 - `src/lib/format.ts` — build brief and builder-prompt formatting
 
 ## Persistence and re-entry
@@ -150,11 +157,12 @@ Each saved project persists its current workflow stage, so reopening a project r
 
 ## AI modes
 
-Forge deliberately has only three reasoning modes:
+Forge deliberately has four reasoning modes:
 
 1. **chat** — update / challenge the working product frame
 2. **directions** — compare three product directions
 3. **lock-thesis** — turn the chosen direction into the Build Brief
+4. **prototype** — turn the locked V1 into a working interactive prototype
 
 This keeps model usage aligned with the product journey and avoids unnecessary calls.
 
