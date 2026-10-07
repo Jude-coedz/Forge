@@ -380,7 +380,7 @@ async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
   const userMessage = typeof body.message === "string" ? body.message.trim() : "";
   const model = env.GEMINI_MODEL || "gemini-3.8-flash";
 
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+  const response = await fetch("https://generativelanguage.googleapis.com/v1/interactions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -388,6 +388,7 @@ async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
     },
     body: JSON.stringify({
       model,
+      store: false,
       system_instruction: systemPrompt(mode),
       input: `CURRENT FORGE CONTEXT:\n${JSON.stringify(context)}\n\nUSER INPUT:\n${userMessage || "Proceed based on the explicit user action."}`,
       generation_config: {
