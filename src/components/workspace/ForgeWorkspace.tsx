@@ -9,10 +9,12 @@ import {
   FileText,
   Lightbulb,
   Monitor,
+  Pencil,
   RefreshCw,
   Send,
   Smartphone,
   Sparkles,
+  X,
 } from "lucide-react";
 import { clock } from "../../lib/id";
 import { useForge } from "../../store/ForgeContext";
@@ -43,9 +45,9 @@ export function ForgeWorkspace() {
 
   const openDecision = conv.productModel.decisions.find((item) => item.status === "open");
   const tabs: Array<{ id: ArtifactTab; label: string; available: boolean }> = [
-    { id: "model", label: "Product model", available: true },
+    { id: "model", label: "Idea", available: true },
     { id: "directions", label: "Directions", available: conv.theses.length > 0 },
-    { id: "brief", label: "Build brief", available: Boolean(conv.spec) },
+    { id: "brief", label: "Brief", available: Boolean(conv.spec) },
     { id: "prototype", label: "Prototype", available: Boolean(conv.prototype) },
   ];
 
@@ -53,8 +55,8 @@ export function ForgeWorkspace() {
     <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface lg:flex-row">
       <section className="flex min-h-[46%] w-full min-w-0 flex-col border-b border-line lg:min-h-0 lg:w-[430px] lg:shrink-0 lg:border-b-0 lg:border-r">
         <div className="shrink-0 border-b border-line px-4 py-3.5 sm:px-5">
-          <p className="text-[13px] font-medium text-ink">Thinking with Forge</p>
-          <p className="mt-0.5 text-[12px] text-ink-4">Talk naturally. Forge keeps the product structure out of your way.</p>
+          <p className="text-[13px] font-medium text-ink">Forge</p>
+          <p className="mt-0.5 text-[12px] text-ink-4">Use chat for reasoning. Use the canvas to inspect and edit the product itself.</p>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 scrollbar-thin sm:px-5">
@@ -207,33 +209,127 @@ function ModelArtifact({ conv }: { conv: Conversation }) {
   const f = useForge();
   const model = conv.productModel;
   const hasModel = Boolean(model.summary || model.opportunity || model.primaryUser || model.desiredOutcome);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({
+    summary: model.summary,
+    primaryUser: model.primaryUser,
+    currentWorkaround: model.currentWorkaround,
+    opportunity: model.opportunity,
+    desiredOutcome: model.desiredOutcome,
+  });
+
+  useEffect(() => {
+    if (editing) return;
+    setDraft({
+      summary: model.summary,
+      primaryUser: model.primaryUser,
+      currentWorkaround: model.currentWorkaround,
+      opportunity: model.opportunity,
+      desiredOutcome: model.desiredOutcome,
+    });
+  }, [
+    editing,
+    model.summary,
+    model.primaryUser,
+    model.currentWorkaround,
+    model.opportunity,
+    model.desiredOutcome,
+  ]);
 
   if (!hasModel && f.generating) {
     return <ArtifactSkeleton />;
   }
 
+  const save = () => {
+    f.updateProductModelFields(draft);
+    setEditing(false);
+  };
+
   return (
-    <div className="mx-auto w-full max-w-[900px] px-8 py-10 xl:px-12 xl:py-12">
-      <div className="max-w-[760px]">
-        <p className="text-[12px] font-medium text-ink-4">Working product model</p>
-        <h1 className="mt-2 text-[32px] font-medium leading-[1.15] tracking-[-0.035em] text-ink">
-          {conv.productName || conv.title || "Untitled product"}
-        </h1>
-        {model.summary && (
-          <p className="mt-4 text-[18px] leading-8 text-ink-2">{model.summary}</p>
+    <div className="mx-auto w-full max-w-[900px] px-7 py-9 xl:px-12 xl:py-11">
+      <div className="flex flex-wrap items-start justify-between gap-5">
+        <div className="max-w-[700px]">
+          <p className="text-[12px] font-medium text-ink-4">Current understanding</p>
+          <h1 className="mt-2 text-[32px] font-medium leading-[1.15] tracking-[-0.035em] text-ink">
+            {conv.productName || conv.title || "Untitled idea"}
+          </h1>
+          {!editing && model.summary && (
+            <p className="mt-4 text-[18px] leading-8 text-ink-2">{model.summary}</p>
+          )}
+        </div>
+
+        {!editing ? (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-ink-4 transition hover:bg-inset hover:text-ink"
+          >
+            <Pencil className="size-3.5" />
+            Edit
+          </button>
+        ) : (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="grid size-8 place-items-center rounded-lg text-ink-4 transition hover:bg-inset hover:text-ink"
+              aria-label="Cancel editing"
+            >
+              <X className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-ink px-3 text-[12px] font-medium text-canvas"
+            >
+              <Check className="size-3.5" />
+              Save
+            </button>
+          </div>
         )}
       </div>
 
-      <div className="mt-10 max-w-[800px] divide-y divide-line border-y border-line">
-        <ModelRow label="Who feels the problem" value={model.primaryUser} />
-        <ModelRow label="What happens today" value={model.currentWorkaround} />
-        <ModelRow label="What is not working" value={model.opportunity} />
-        <ModelRow label="What better looks like" value={model.desiredOutcome} />
-      </div>
+      {editing ? (
+        <div className="mt-8 max-w-[820px] space-y-5">
+          <EditField
+            label="In one sentence"
+            value={draft.summary}
+            onChange={(value) => setDraft((current) => ({ ...current, summary: value }))}
+            rows={2}
+          />
+          <EditField
+            label="Who feels the problem?"
+            value={draft.primaryUser}
+            onChange={(value) => setDraft((current) => ({ ...current, primaryUser: value }))}
+          />
+          <EditField
+            label="What happens today?"
+            value={draft.currentWorkaround}
+            onChange={(value) => setDraft((current) => ({ ...current, currentWorkaround: value }))}
+          />
+          <EditField
+            label="What is actually not working?"
+            value={draft.opportunity}
+            onChange={(value) => setDraft((current) => ({ ...current, opportunity: value }))}
+          />
+          <EditField
+            label="What would a better outcome look like?"
+            value={draft.desiredOutcome}
+            onChange={(value) => setDraft((current) => ({ ...current, desiredOutcome: value }))}
+          />
+        </div>
+      ) : (
+        <div className="mt-9 max-w-[820px] divide-y divide-line border-y border-line">
+          <ModelRow label="Who feels the problem" value={model.primaryUser} />
+          <ModelRow label="What happens today" value={model.currentWorkaround} />
+          <ModelRow label="What is not working" value={model.opportunity} />
+          <ModelRow label="What better looks like" value={model.desiredOutcome} />
+        </div>
+      )}
 
-      {(model.evidence.length > 0 || model.assumptions.length > 0) && (
-        <div className="mt-10 grid max-w-[860px] gap-8 md:grid-cols-2">
-          <ArtifactSection title="What we actually know">
+      {!editing && (model.evidence.length > 0 || model.assumptions.length > 0) && (
+        <div className="mt-9 grid max-w-[860px] gap-8 md:grid-cols-2">
+          <ArtifactSection title="What supports the idea">
             {model.evidence.length > 0 ? (
               <div className="space-y-3">
                 {model.evidence.slice(0, 4).map((item) => (
@@ -244,11 +340,13 @@ function ModelArtifact({ conv }: { conv: Conversation }) {
                 ))}
               </div>
             ) : (
-              <p className="text-[14px] leading-6 text-ink-4">No strong evidence captured yet. Forge is keeping the current model provisional.</p>
+              <p className="text-[14px] leading-6 text-ink-4">
+                No real evidence has been added yet. Forge is treating this as a working hypothesis.
+              </p>
             )}
           </ArtifactSection>
 
-          <ArtifactSection title="What we are assuming">
+          <ArtifactSection title="What still needs proving">
             {model.assumptions.length > 0 ? (
               <div className="space-y-3">
                 {model.assumptions.filter((item) => item.status === "untested").slice(0, 4).map((item) => (
@@ -259,32 +357,62 @@ function ModelArtifact({ conv }: { conv: Conversation }) {
                 ))}
               </div>
             ) : (
-              <p className="text-[14px] leading-6 text-ink-4">Nothing important is being treated as an explicit assumption yet.</p>
+              <p className="text-[14px] leading-6 text-ink-4">
+                Forge has not identified a major unproven assumption yet.
+              </p>
             )}
           </ArtifactSection>
         </div>
       )}
 
-      <div className="mt-12 max-w-[860px] border-t border-line pt-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-[14px] font-medium text-ink">Ready to see what this could become?</p>
-            <p className="mt-1 text-[13px] text-ink-4">Forge can compare three different product mechanisms without pretending every assumption is settled.</p>
+      {!editing && (
+        <div className="mt-11 max-w-[860px] rounded-[16px] border border-line bg-raised/55 px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-[13px] font-medium text-ink">Next useful move</p>
+              <p className="mt-1 text-[12px] leading-5 text-ink-4">
+                Compare genuinely different ways this product could solve the problem before deciding what to prototype.
+              </p>
+            </div>
+            <Button variant="primary" disabled={f.generating || !hasModel} onClick={f.advanceToDirections}>
+              Explore directions
+              <ArrowRight className="size-3.5" />
+            </Button>
           </div>
-          <Button variant="primary" disabled={f.generating || !hasModel} onClick={f.advanceToDirections}>
-            Compare directions
-            <ArrowRight className="size-3.5" />
-          </Button>
         </div>
-      </div>
+      )}
     </div>
+  );
+}
+
+function EditField({
+  label,
+  value,
+  onChange,
+  rows = 3,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  rows?: number;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[12px] font-medium text-ink-4">{label}</span>
+      <textarea
+        rows={rows}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full resize-y rounded-[12px] border border-line-strong bg-raised px-3.5 py-3 text-[14px] leading-6 text-ink outline-none transition focus:border-spark/35"
+      />
+    </label>
   );
 }
 
 function ModelRow({ label, value }: { label: string; value: string }) {
   if (!value) return null;
   return (
-    <div className="grid gap-2 py-5 sm:grid-cols-[190px_1fr] sm:gap-8">
+    <div className="grid gap-2 py-5 sm:grid-cols-[180px_1fr] sm:gap-8">
       <span className="text-[13px] text-ink-4">{label}</span>
       <span className="text-[15px] leading-6 text-ink-2">{value}</span>
     </div>
@@ -308,9 +436,9 @@ function DirectionsArtifact({ conv }: { conv: Conversation }) {
     <div className="mx-auto w-full max-w-[980px] px-8 py-10 xl:px-12 xl:py-12">
       <div className="max-w-[720px]">
         <p className="text-[12px] font-medium text-ink-4">Product directions</p>
-        <h1 className="mt-2 text-[32px] font-medium tracking-[-0.035em] text-ink">Choose the mechanism, not the feature list.</h1>
+        <h1 className="mt-2 text-[32px] font-medium tracking-[-0.035em] text-ink">Three ways this product could work.</h1>
         <p className="mt-3 text-[15px] leading-7 text-ink-3">
-          These are deliberately different ways the product could solve the same problem. Pick the one you believe deserves to exist.
+          Forge is keeping the options meaningfully different so you can choose a product mechanism, not a blended feature list.
         </p>
       </div>
 
@@ -335,7 +463,7 @@ function DirectionsArtifact({ conv }: { conv: Conversation }) {
           None of these feel right
         </button>
         <Button variant="primary" disabled={!selected || f.generating} onClick={f.lockThesis}>
-          {f.generating ? "Building the brief…" : selected ? `Commit to ${selected.title}` : "Choose a direction"}
+          {f.generating ? "Building the brief…" : selected ? `Choose ${selected.title}` : "Choose a direction"}
           {!f.generating && <ChevronRight className="size-3.5" />}
         </Button>
       </div>
@@ -625,7 +753,7 @@ function MobileArtifact({
   setTab: (tab: ArtifactTab) => void;
 }) {
   const tabs: Array<{ id: ArtifactTab; label: string; available: boolean }> = [
-    { id: "model", label: "Model", available: true },
+    { id: "model", label: "Idea", available: true },
     { id: "directions", label: "Directions", available: conv.theses.length > 0 },
     { id: "brief", label: "Brief", available: Boolean(conv.spec) },
     { id: "prototype", label: "Prototype", available: Boolean(conv.prototype) },
