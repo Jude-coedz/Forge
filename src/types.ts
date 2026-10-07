@@ -1,4 +1,4 @@
-export type ProjectStage = "frame" | "challenge" | "decide" | "brief" | "handoff";
+export type ProjectStage = "frame" | "challenge" | "decide" | "brief" | "prototype" | "handoff";
 export type Theme = "dark" | "light";
 export type Severity = "critical" | "high" | "medium" | "low";
 
@@ -92,6 +92,13 @@ export type ValidationItem = {
   successSignal: string;
 };
 
+export type PrototypeDoc = {
+  html: string;
+  summary: string;
+  screens: string[];
+  builtAt: number;
+};
+
 export type SpecDoc = {
   productName: string;
   thesis: string;
@@ -117,6 +124,7 @@ export type Conversation = {
   selectedThesis: ThesisId;
   thesisLocked: boolean;
   spec: SpecDoc | null;
+  prototype: PrototypeDoc | null;
   productName: string;
 };
 
