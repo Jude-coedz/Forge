@@ -30,6 +30,7 @@ export function ForgeWorkspace() {
   const conv = f.conv;
   const bottom = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<ArtifactTab>("model");
+  const [mobilePane, setMobilePane] = useState<"chat" | "canvas">("chat");
 
   useEffect(() => {
     if (!conv) return;
@@ -57,7 +58,26 @@ export function ForgeWorkspace() {
 
   return (
     <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface lg:flex-row">
-      <section className="flex min-h-[46%] w-full min-w-0 flex-col border-b border-line lg:min-h-0 lg:w-[430px] lg:shrink-0 lg:border-b-0 lg:border-r">
+      <div className="flex shrink-0 border-b border-line bg-canvas px-3 py-2 lg:hidden">
+        <div className="flex rounded-lg bg-inset p-0.5">
+          <button
+            type="button"
+            onClick={() => setMobilePane("chat")}
+            className={"rounded-md px-3 py-1.5 text-[12px] font-medium transition " + (mobilePane === "chat" ? "bg-raised text-ink shadow-sm" : "text-ink-4")}
+          >
+            Chat
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobilePane("canvas")}
+            className={"rounded-md px-3 py-1.5 text-[12px] font-medium transition " + (mobilePane === "canvas" ? "bg-raised text-ink shadow-sm" : "text-ink-4")}
+          >
+            Canvas
+          </button>
+        </div>
+      </div>
+
+      <section className={(mobilePane === "chat" ? "flex" : "hidden") + " min-h-0 w-full min-w-0 flex-1 flex-col lg:flex lg:w-[420px] lg:shrink-0 lg:flex-none lg:border-r xl:w-[480px]"}>
         <div className="shrink-0 border-b border-line px-4 py-3.5 sm:px-5">
           <p className="text-[13px] font-medium text-ink">Forge</p>
           <p className="mt-0.5 text-[12px] text-ink-4">Use chat for reasoning. Use the canvas to inspect and edit the product itself.</p>
@@ -134,7 +154,7 @@ export function ForgeWorkspace() {
         </div>
       </section>
 
-      <section className="min-h-0 min-w-0 flex-1 lg:hidden">
+      <section className={(mobilePane === "canvas" ? "flex" : "hidden") + " min-h-0 min-w-0 flex-1 flex-col lg:hidden"}>
         <MobileArtifact conv={conv} tab={tab} setTab={setTab} />
       </section>
     </main>
