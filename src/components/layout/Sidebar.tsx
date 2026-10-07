@@ -1,17 +1,8 @@
 import { useState } from "react";
-import {
-  Check,
-  FileText,
-  MoreHorizontal,
-  PanelLeft,
-  Pencil,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Check, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useForge } from "../../store/ForgeContext";
-import { Button, ForgeMark } from "../ui/primitives";
+import { ForgeMark } from "../ui/primitives";
 import type { Conversation } from "../../types";
 
 export function Sidebar() {
@@ -39,7 +30,7 @@ export function Sidebar() {
     <>
       {f.sidebarOpen && (
         <button
-          className="fixed inset-0 z-30 bg-black/30 backdrop-blur-[2px] md:hidden"
+          className="fixed inset-0 z-30 bg-black/20 backdrop-blur-[2px] md:hidden"
           aria-label="Close projects"
           onClick={() => f.setSidebarOpen(false)}
         />
@@ -47,54 +38,46 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex flex-col border-r border-line bg-canvas transition-[width,transform] duration-200 md:static md:z-0 md:translate-x-0",
-          f.sidebarCollapsed ? "md:w-[72px]" : "md:w-[268px]",
-          f.sidebarOpen ? "w-[268px] translate-x-0" : "w-[268px] -translate-x-full md:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col border-r border-line bg-canvas transition-transform duration-200 md:static md:z-0 md:translate-x-0",
+          f.sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
       >
-        <div className={cn("flex h-[54px] items-center gap-2 px-3", f.sidebarCollapsed && "md:justify-center")}>
+        <div className="flex h-12 items-center px-3.5">
           <button
             type="button"
             onClick={f.newProject}
-            className="flex items-center gap-2.5 rounded-xl text-left focus-visible:outline-none"
+            className="flex items-center gap-2.5 rounded-lg text-left"
             aria-label="Forge home"
           >
-            <ForgeMark className="size-8" />
-            <div className={cn("min-w-0", f.sidebarCollapsed && "md:hidden")}>
-              <div className="font-display text-[15px] font-semibold leading-none tracking-[-0.02em]">Forge</div>
-              <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.11em] text-ink-4">Product decisions</div>
-            </div>
+            <ForgeMark className="size-7" />
+            <span className="text-[14px] font-semibold tracking-[-0.015em] text-ink">Forge</span>
           </button>
         </div>
 
-        <div className="px-2 pt-2">
-          <Button
-            className={cn("w-full justify-start rounded-xl", f.sidebarCollapsed && "md:justify-center md:px-0")}
+        <div className="px-2.5 pt-2">
+          <button
+            type="button"
             onClick={() => {
               f.newProject();
               setMenuId(null);
             }}
+            className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium text-ink-2 transition hover:bg-inset hover:text-ink"
           >
             <Plus className="size-4" />
-            <span className={cn(f.sidebarCollapsed && "md:hidden")}>New product idea</span>
-          </Button>
+            New idea
+          </button>
         </div>
 
-        <div className="mt-6 min-h-0 flex-1 overflow-y-auto px-2 scrollbar-thin">
-          <div className={cn("mb-2 flex items-center justify-between px-2", f.sidebarCollapsed && "md:hidden")}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-4">Projects</p>
-            {projects.length > 0 && <span className="font-mono text-[10px] text-ink-4">{projects.length}</span>}
-          </div>
+        <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-2.5 scrollbar-thin">
+          <p className="px-2.5 pb-2 text-[11px] font-medium text-ink-4">Projects</p>
 
           {projects.length === 0 && (
-            <div className={cn("mx-1 rounded-xl border border-dashed border-line-strong p-3", f.sidebarCollapsed && "md:hidden")}>
-              <p className="text-[12px] leading-5 text-ink-4">
-                Saved decisions will appear here after you start shaping an idea.
-              </p>
-            </div>
+            <p className="px-2.5 text-[12px] leading-5 text-ink-4">
+              Your product thinking will stay here as you work.
+            </p>
           )}
 
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {projects.map((project) => {
               const active = f.activeId === project.id;
               const editing = editingId === project.id;
@@ -103,23 +86,15 @@ export function Sidebar() {
                 <div key={project.id} className="group relative">
                   <div
                     className={cn(
-                      "flex min-h-[44px] w-full items-center gap-2 rounded-xl border px-2 text-left text-[13px] transition-all duration-150",
-                      active
-                        ? "border-line-strong bg-raised text-ink shadow-sm"
-                        : "border-transparent text-ink-3 hover:border-line hover:bg-raised/70 hover:text-ink",
-                      f.sidebarCollapsed && "md:justify-center",
+                      "flex min-h-[40px] w-full items-center gap-2 rounded-lg px-2.5 text-left transition",
+                      active ? "bg-inset text-ink" : "text-ink-3 hover:bg-inset/70 hover:text-ink",
                     )}
                   >
-                    <span className={cn(
-                      "grid size-7 shrink-0 place-items-center rounded-lg",
-                      active ? "bg-spark-soft text-spark" : "bg-inset text-ink-4",
-                    )}>
-                      <FileText className="size-3.5" />
-                    </span>
+                    <span className={"size-1.5 shrink-0 rounded-full " + statusTone(project)} />
 
                     {editing ? (
                       <form
-                        className={cn("flex min-w-0 flex-1 items-center gap-1", f.sidebarCollapsed && "md:hidden")}
+                        className="flex min-w-0 flex-1 items-center gap-1"
                         onSubmit={(event) => {
                           event.preventDefault();
                           saveRename();
@@ -132,30 +107,26 @@ export function Sidebar() {
                           onKeyDown={(event) => {
                             if (event.key === "Escape") setEditingId(null);
                           }}
-                          className="min-w-0 flex-1 rounded-lg border border-line-strong bg-canvas px-2 py-1 text-[12px] outline-none"
+                          className="min-w-0 flex-1 rounded-md border border-line-strong bg-raised px-2 py-1 text-[12px] outline-none"
                         />
-                        <button type="submit" className="grid size-7 place-items-center rounded-lg hover:bg-inset" aria-label="Save name">
+                        <button type="submit" className="grid size-7 place-items-center rounded-md hover:bg-raised" aria-label="Save name">
                           <Check className="size-3.5" />
                         </button>
-                        <button type="button" onClick={() => setEditingId(null)} className="grid size-7 place-items-center rounded-lg hover:bg-inset" aria-label="Cancel rename">
+                        <button type="button" onClick={() => setEditingId(null)} className="grid size-7 place-items-center rounded-md hover:bg-raised" aria-label="Cancel rename">
                           <X className="size-3.5" />
                         </button>
                       </form>
                     ) : (
                       <button
                         type="button"
-                        className={cn("min-w-0 flex-1 text-left", f.sidebarCollapsed && "md:hidden")}
+                        className="min-w-0 flex-1 truncate text-left text-[12px] font-medium"
                         onClick={() => {
                           f.openConversation(project.id);
                           setMenuId(null);
                         }}
                         title={project.title}
                       >
-                        <span className="block truncate text-[12px] font-medium">{project.title}</span>
-                        <span className="mt-0.5 flex items-center gap-1.5 text-[10px] text-ink-4">
-                          <span className={"size-1.5 rounded-full " + statusTone(project)} />
-                          {statusLabel(project)}
-                        </span>
+                        {project.title}
                       </button>
                     )}
 
@@ -163,12 +134,7 @@ export function Sidebar() {
                       <button
                         type="button"
                         onClick={() => setMenuId(menuId === project.id ? null : project.id)}
-                        className={cn(
-                          "grid size-7 shrink-0 place-items-center rounded-lg text-ink-4 transition hover:bg-inset hover:text-ink",
-                          f.sidebarCollapsed
-                            ? "md:hidden"
-                            : "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100",
-                        )}
+                        className="grid size-7 shrink-0 place-items-center rounded-md text-ink-4 opacity-0 transition hover:bg-raised hover:text-ink group-hover:opacity-100 focus:opacity-100"
                         aria-label={"Project options for " + project.title}
                       >
                         <MoreHorizontal className="size-4" />
@@ -177,15 +143,15 @@ export function Sidebar() {
                   </div>
 
                   {menuId === project.id && !editing && (
-                    <div className="absolute right-1 top-11 z-50 w-44 rounded-[14px] border border-line bg-raised p-1.5 shadow-[var(--shadow-toast)]">
+                    <div className="absolute right-1 top-10 z-50 w-44 rounded-xl border border-line bg-raised p-1.5 shadow-[var(--shadow-toast)]">
                       {confirmDeleteId === project.id ? (
                         <div className="p-2">
-                          <p className="text-[12px] text-ink-3">Delete this product decision?</p>
+                          <p className="text-[12px] text-ink-3">Delete this project?</p>
                           <div className="mt-2 flex gap-2">
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteId(null)}
-                              className="flex-1 rounded-lg border border-line px-2 py-1.5 text-[11px] text-ink-3 hover:bg-inset"
+                              className="flex-1 rounded-md border border-line px-2 py-1.5 text-[11px] text-ink-3 hover:bg-inset"
                             >
                               Cancel
                             </button>
@@ -196,7 +162,7 @@ export function Sidebar() {
                                 setMenuId(null);
                                 setConfirmDeleteId(null);
                               }}
-                              className="flex-1 rounded-lg bg-scorch px-2 py-1.5 text-[11px] text-white"
+                              className="flex-1 rounded-md bg-scorch px-2 py-1.5 text-[11px] text-white"
                             >
                               Delete
                             </button>
@@ -230,27 +196,12 @@ export function Sidebar() {
           </div>
         </div>
 
-        <div className="border-t border-line p-2">
-          <button
-            type="button"
-            onClick={() => f.setSidebarCollapsed(!f.sidebarCollapsed)}
-            className="hidden w-full items-center gap-2 rounded-xl px-2 py-2 text-[12px] text-ink-4 transition hover:bg-inset hover:text-ink md:flex"
-          >
-            <PanelLeft className="size-4" />
-            <span className={cn(f.sidebarCollapsed && "md:hidden")}>Collapse sidebar</span>
-          </button>
+        <div className="border-t border-line px-4 py-3">
+          <p className="text-[11px] leading-5 text-ink-4">Your current work is saved in this browser.</p>
         </div>
       </aside>
     </>
   );
-}
-
-function statusLabel(project: Conversation) {
-  if (project.prototype) return "Prototype ready";
-  if (project.spec) return "V1 locked";
-  if (project.theses.length > 0) return "Choosing direction";
-  if (project.productModel.summary || project.productModel.opportunity) return "Framing";
-  return "Started";
 }
 
 function statusTone(project: Conversation) {
