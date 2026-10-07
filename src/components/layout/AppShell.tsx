@@ -38,7 +38,7 @@ function TopBar() {
   const f = useForge();
 
   return (
-    <header className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-b border-line bg-canvas/92 px-3 backdrop-blur-xl sm:px-4">
+    <header className="relative z-20 flex h-[52px] shrink-0 items-center gap-2 border-b border-line bg-canvas/92 px-3 backdrop-blur-xl sm:px-4">
       <Button
         size="icon"
         variant="ghost"
@@ -51,14 +51,14 @@ function TopBar() {
 
       <div className="min-w-0 flex-1">
         {f.conv ? (
-          <span className="block truncate text-[13px] font-medium text-ink-2">{f.conv.title}</span>
+          <span className="block truncate text-[14px] font-medium text-ink-2">{f.conv.title}</span>
         ) : (
-          <span className="text-[13px] text-ink-4">New idea</span>
+          <span className="text-[14px] text-ink-4">New idea</span>
         )}
       </div>
 
       {f.generating && (
-        <span className="hidden items-center gap-2 text-[11px] text-ink-4 sm:flex">
+        <span className="hidden items-center gap-2 text-[12px] text-ink-4 sm:flex">
           <span className="forge-thinking-dot size-1.5 rounded-full bg-spark" />
           Thinking
         </span>
