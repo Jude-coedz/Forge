@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, Check, ClipboardCopy, FileText, Plus } from "lucide-react";
+import { ArrowLeft, Check, ClipboardCopy, Code2, FileText, Plus } from "lucide-react";
 import { builderPrompt } from "../../lib/format";
 import { useForge } from "../../store/ForgeContext";
 import { Button } from "../ui/primitives";
@@ -9,8 +9,9 @@ export function HandoffScreen() {
   const f = useForge();
   const conv = f.conv!;
   const spec = conv.spec;
+  const prototype = conv.prototype;
 
-  if (!spec) return null;
+  if (!spec || !prototype) return null;
 
   const unresolved = spec.validationPlan.slice(0, 3);
 
@@ -18,69 +19,80 @@ export function HandoffScreen() {
     await navigator.clipboard.writeText(builderPrompt(spec));
     f.toast({
       title: "Builder prompt copied",
-      body: "Paste it into the tool you use to implement or prototype the product.",
+      body: "The locked V1 and acceptance criteria are ready for your implementation tool.",
       tone: "success",
     });
   };
 
   return (
     <ScreenShell
-      eyebrow="5 · Handoff"
-      title="You know what you are building now"
-      description="Forge is finished when the product decision is clear enough to hand to a builder without losing the reasoning behind it."
+      eyebrow="6 · Handoff"
+      title="The decision is ready to leave Forge"
+      description="The product direction, build scope, working prototype, and unresolved assumptions now travel together. Engineering gets the decision, not just a feature list."
     >
-      <div className="max-w-3xl">
-        <div className="flex items-start gap-3 border-y border-line py-5">
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-temper-soft text-temper">
-            <Check className="size-5" />
-          </span>
-          <div>
-            <p className="text-[16px] font-medium">Build brief complete</p>
-            <p className="mt-1 text-[14px] leading-6 text-ink-3">
-              The chosen direction, V1 scope, requirements, non-goals, risks, and validation work are preserved in this project.
-            </p>
+      <div className="max-w-4xl">
+        <div className="rounded-[24px] border border-temper/25 bg-temper-soft/60 p-5 sm:p-6">
+          <div className="flex items-start gap-4">
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-temper text-white">
+              <Check className="size-5" />
+            </span>
+            <div>
+              <p className="text-[18px] font-semibold tracking-tight">Decision package complete</p>
+              <p className="mt-1 max-w-2xl text-[14px] leading-6 text-ink-3">
+                {spec.productName} now has a locked direction, focused V1 brief, interactive prototype, and explicit validation work.
+              </p>
+            </div>
           </div>
         </div>
 
-        <SectionRule title="Take it into your build workflow">
-          <div className="divide-y divide-line border-y border-line">
+        <SectionRule title="Take it into your build workflow" accent>
+          <div className="divide-y divide-line rounded-[20px] border border-line bg-raised px-5">
             <ActionRow
               icon={<FileText className="size-5" />}
-              title="Copy the full build brief"
-              body="Use this when you want the reasoning, requirements, risks, and validation plan together."
+              title="Full Build Brief"
+              body="Reasoning, V1 scope, requirements, non-goals, failure modes, and validation work."
               action="Copy brief"
               onClick={f.copySpec}
             />
             <ActionRow
+              icon={<Code2 className="size-5" />}
+              title="Working prototype"
+              body="A self-contained interactive HTML prototype generated from this exact brief."
+              action="Copy HTML"
+              onClick={f.copyPrototype}
+            />
+            <ActionRow
               icon={<ClipboardCopy className="size-5" />}
-              title="Copy a builder prompt"
-              body="A shorter implementation handoff that keeps the V1 scope and acceptance criteria intact."
-              action="Copy builder prompt"
+              title="Builder prompt"
+              body="A compact handoff for a coding agent that preserves the product decisions and acceptance criteria."
+              action="Copy prompt"
               onClick={copyBuilderPrompt}
             />
           </div>
         </SectionRule>
 
         {unresolved.length > 0 && (
-          <SectionRule title="Still unresolved">
-            <p className="mb-3 text-[13px] leading-5 text-ink-4">
-              These do not block the handoff, but they should not quietly become facts during implementation.
-            </p>
-            <ul className="space-y-2">
-              {unresolved.map((item, index) => (
-                <li key={item.risk + "-" + index} className="flex gap-2 text-[14px] leading-5 text-ink-2">
-                  <span className="text-ink-4">•</span>
-                  <span>{item.assumption}</span>
-                </li>
-              ))}
-            </ul>
+          <SectionRule title="Carry these uncertainties forward">
+            <div className="rounded-[20px] border border-molten/20 bg-molten-soft/40 p-5">
+              <p className="mb-4 text-[14px] leading-6 text-ink-3">
+                These do not block implementation, but the builder should not silently turn them into facts.
+              </p>
+              <ul className="space-y-3">
+                {unresolved.map((item, index) => (
+                  <li key={item.risk + "-" + index} className="flex gap-3 text-[14px] leading-6 text-ink-2">
+                    <span className="mt-2 size-1.5 shrink-0 rounded-full bg-molten" />
+                    <span>{item.assumption}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </SectionRule>
         )}
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
-          <Button variant="ghost" onClick={() => f.setProjectStage("brief")}>
+          <Button variant="ghost" onClick={() => f.setProjectStage("prototype")}>
             <ArrowLeft className="size-3.5" />
-            Back to brief
+            Back to prototype
           </Button>
           <Button variant="secondary" onClick={f.newProject}>
             <Plus className="size-3.5" />
@@ -106,11 +118,11 @@ function ActionRow({
   onClick: () => void;
 }) {
   return (
-    <div className="grid gap-4 py-5 sm:grid-cols-[28px_1fr_auto] sm:items-center">
-      <div className="text-ink-4">{icon}</div>
+    <div className="grid gap-4 py-5 sm:grid-cols-[36px_1fr_auto] sm:items-center">
+      <div className="grid size-9 place-items-center rounded-xl bg-inset text-ink-3">{icon}</div>
       <div>
         <p className="text-[15px] font-medium">{title}</p>
-        <p className="mt-1 max-w-xl text-[13px] leading-5 text-ink-4">{body}</p>
+        <p className="mt-1 max-w-xl text-[14px] leading-5 text-ink-4">{body}</p>
       </div>
       <Button size="sm" variant="secondary" onClick={onClick}>
         {action}
