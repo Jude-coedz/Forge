@@ -179,6 +179,7 @@ type ForgeContextValue = {
   setSidebarCollapsed: (value: boolean) => void;
   setComposer: (value: string) => void;
   setProjectStage: (stage: ProjectStage) => void;
+  updateProductModelFields: (patch: Partial<Pick<ProductModel, "summary" | "primaryUser" | "opportunity" | "currentWorkaround" | "desiredOutcome">>) => void;
   toggleTheme: () => void;
   newProject: () => void;
   openConversation: (id: string) => void;
@@ -274,6 +275,31 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
   const setProjectStage = useCallback((stage: ProjectStage) => {
     patchActive((conversation) => ({ ...conversation, stage }));
   }, [patchActive]);
+
+  const updateProductModelFields = useCallback((patch: Partial<Pick<ProductModel, "summary" | "primaryUser" | "opportunity" | "currentWorkaround" | "desiredOutcome">>) => {
+    if (!conv) return;
+
+    const nextModel = { ...conv.productModel, ...patch };
+    const changed = frameChanged(conv.productModel, nextModel);
+
+    patchActive((conversation) => ({
+      ...conversation,
+      productModel: nextModel,
+      theses: changed ? [] : conversation.theses,
+      thesisLocked: changed ? false : conversation.thesisLocked,
+      spec: changed ? null : conversation.spec,
+      prototype: changed ? null : conversation.prototype,
+      stage: changed ? "frame" : conversation.stage,
+    }));
+
+    toast({
+      title: "Idea updated",
+      body: changed && (conv.theses.length > 0 || conv.spec || conv.prototype)
+        ? "Downstream directions and build outputs were cleared because the core idea changed."
+        : "Forge will use this correction in the next reasoning step.",
+      tone: changed && (conv.theses.length > 0 || conv.spec || conv.prototype) ? "warn" : "success",
+    });
+  }, [conv, patchActive, toast]);
 
   const appendAssistant = useCallback((conversationId: string, reply: string) => {
     const message: ChatMessage = {
@@ -539,6 +565,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     setSidebarCollapsed,
     setComposer,
     setProjectStage,
+    updateProductModelFields,
     toggleTheme,
     newProject,
     openConversation,
@@ -564,6 +591,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     generating,
     toasts,
     setProjectStage,
+    updateProductModelFields,
     toggleTheme,
     newProject,
     openConversation,
