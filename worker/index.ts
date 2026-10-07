@@ -7,7 +7,7 @@ type Env = {
   ASSETS: AssetsBinding;
 };
 
-type TurnMode = "chat" | "directions" | "lock-thesis" | "prototype";
+type TurnMode = "chat" | "research" | "directions" | "lock-thesis" | "prototype";
 
 type TurnBody = {
   mode?: TurnMode;
@@ -167,6 +167,65 @@ const metricSchema = {
   required: ["name", "target"],
 };
 
+const researchSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    summary: { type: "string" },
+    signals: {
+      type: "array",
+      minItems: 2,
+      maxItems: 6,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          title: { type: "string" },
+          detail: { type: "string" },
+          stance: { type: "string", enum: ["supports", "challenges", "context"] },
+        },
+        required: ["title", "detail", "stance"],
+      },
+    },
+    alternatives: {
+      type: "array",
+      minItems: 0,
+      maxItems: 6,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: { type: "string" },
+          description: { type: "string" },
+          relevance: { type: "string" },
+        },
+        required: ["name", "description", "relevance"],
+      },
+    },
+    unresolved: {
+      type: "array",
+      minItems: 0,
+      maxItems: 6,
+      items: { type: "string" },
+    },
+    sources: {
+      type: "array",
+      minItems: 1,
+      maxItems: 10,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          title: { type: "string" },
+          url: { type: "string" },
+        },
+        required: ["title", "url"],
+      },
+    },
+  },
+  required: ["summary", "signals", "alternatives", "unresolved", "sources"],
+};
+
 const prototypeSchema = {
   type: "object",
   additionalProperties: false,
@@ -206,6 +265,25 @@ const specSchema = {
 };
 
 function structuredFormat(mode: TurnMode) {
+  if (mode === "research") {
+    return {
+      type: "json_schema",
+      json_schema: {
+        name: "forge_grounded_market_research",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            reply: { type: "string" },
+            research: researchSchema,
+          },
+          required: ["reply", "research"],
+        },
+      },
+    };
+  }
+
   if (mode === "directions") {
     return {
       type: "json_schema",
@@ -322,6 +400,32 @@ RESPONSE STYLE
 - Prefer a useful synthesis, recommendation, or explicit assumption over asking for more context.
 - Leave unknown Product Model string fields empty. Never fill them with placeholders such as "not clear yet", "unknown", or "TBD".`;
 
+  if (mode === "research") {
+    return `${core}
+
+The user has explicitly asked Forge to research the current market around the product hypothesis.
+
+Use Google Search grounding. This is product validation research, not a generic market report.
+
+RESEARCH GOALS
+- Find current products, workflows, or substitutes that already address the same problem or desired outcome.
+- Look for concrete signals that support, challenge, or add important context to the problem.
+- Identify where the user's proposed opportunity appears differentiated, redundant, or still unproven.
+- Surface contradictions and uncomfortable evidence rather than trying to validate the idea.
+- Preserve uncertainty. Search results can show that alternatives or discussions exist; they do not prove willingness to pay or market size.
+- Do not invent TAM, demand, customer frequency, revenue, adoption, or willingness to switch.
+- Prefer primary sources, official product pages, credible reporting, and direct community evidence when relevant.
+- Only include source URLs that were actually surfaced by Google Search during this interaction.
+
+OUTPUT
+- summary: 2-4 sentences on what the external evidence changes about the product hypothesis.
+- signals: 2-6 concrete findings, each marked supports, challenges, or context.
+- alternatives: up to 6 directly relevant products or substitutes, with why each matters to this idea.
+- unresolved: the most important things web research still cannot prove.
+- sources: the useful URLs actually used.
+- reply: a concise 1-3 sentence conversational takeaway. Do not repeat the whole report.`;
+  }
+
   if (mode === "directions") {
     return `${core}
 
@@ -405,9 +509,10 @@ async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
       system_instruction: systemPrompt(mode),
       input: `CURRENT FORGE CONTEXT:\n${JSON.stringify(context)}\n\nUSER INPUT:\n${userMessage || "Proceed based on the explicit user action."}`,
       generation_config: {
-        thinking_level: mode === "chat" ? "low" : mode === "prototype" ? "high" : "medium",
+        thinking_level: mode === "chat" ? "low" : mode === "prototype" ? "high" : mode === "research" ? "medium" : "medium",
         max_output_tokens: mode === "prototype" ? 24000 : mode === "chat" ? 6000 : 10000,
       },
+      ...(mode === "research" ? { tools: [{ type: "google_search" }] } : {}),
       response_format: {
         type: "text",
         mime_type: "application/json",
@@ -460,7 +565,7 @@ async function handleTurn(request: Request, env: Env): Promise<Response> {
   }
 
   const mode: TurnMode =
-    body.mode === "directions" || body.mode === "lock-thesis" || body.mode === "prototype"
+    body.mode === "research" || body.mode === "directions" || body.mode === "lock-thesis" || body.mode === "prototype"
       ? body.mode
       : "chat";
   const message = typeof body.message === "string" ? body.message.trim() : "";
