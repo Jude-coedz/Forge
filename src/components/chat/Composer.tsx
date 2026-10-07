@@ -32,12 +32,10 @@ function getSpeechRecognition() {
 
 export function Composer({
   autoFocus,
-  placeholder = "Describe the idea, paste notes, customer feedback, or context from another AI conversation…",
-  helper = "Enter to send · Shift + Enter for a new line",
+  placeholder = "Describe the idea, problem, or paste context…",
 }: {
   autoFocus?: boolean;
   placeholder?: string;
-  helper?: string;
 }) {
   const f = useForge();
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -51,12 +49,14 @@ export function Composer({
 
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
+    recognitionRef.current?.stop();
     f.sendChat();
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
+      recognitionRef.current?.stop();
       f.sendChat();
     }
   };
@@ -77,15 +77,20 @@ export function Composer({
     recognition.lang = "en-US";
 
     let committed = f.composer.trim();
+
     recognition.onresult = (event) => {
       let interim = "";
       for (let index = 0; index < event.results.length; index += 1) {
         const result = event.results[index];
-        if (result.isFinal) committed = (committed + " " + result[0].transcript).trim();
-        else interim += result[0].transcript;
+        if (result.isFinal) {
+          committed = (committed + " " + result[0].transcript).trim();
+        } else {
+          interim += result[0].transcript;
+        }
       }
       f.setComposer((committed + " " + interim).trim());
     };
+
     recognition.onend = () => setListening(false);
     recognition.onerror = () => setListening(false);
     recognitionRef.current = recognition;
@@ -95,44 +100,61 @@ export function Composer({
 
   return (
     <form onSubmit={submit} className="w-full">
-      <div className="group rounded-[20px] border border-line-strong bg-raised p-2.5 shadow-[var(--shadow-soft)] transition focus-within:border-spark/30 focus-within:shadow-[var(--shadow-focus)]">
+      <div
+        className={
+          "group rounded-[24px] border bg-raised p-3 shadow-[var(--shadow-soft)] transition-[border-color,box-shadow] duration-200 " +
+          (listening
+            ? "border-line-strong shadow-[var(--shadow-listening)]"
+            : "border-line focus-within:border-line-strong focus-within:shadow-[var(--shadow-focus)]")
+        }
+      >
         <textarea
           autoFocus={autoFocus}
-          rows={5}
+          rows={6}
           value={f.composer}
           onChange={(event) => f.setComposer(event.target.value)}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
-          className="min-h-[138px] w-full resize-none bg-transparent px-2.5 py-2 text-[16px] leading-7 text-ink outline-none placeholder:text-ink-4 focus-visible:outline-none"
+          className="min-h-[168px] w-full resize-none bg-transparent px-3 py-2 text-[18px] leading-8 text-ink outline-none placeholder:text-ink-4 focus-visible:outline-none"
         />
-        <div className="flex items-center justify-between gap-3 px-1 pt-1">
-          <div className="flex min-w-0 items-center gap-2">
+
+        <div className="flex items-center justify-between px-1 pt-1.5">
+          <div className="flex items-center gap-2">
             {speechAvailable && (
               <button
                 type="button"
                 onClick={toggleDictation}
                 className={
-                  "grid size-8 shrink-0 place-items-center rounded-lg transition " +
-                  (listening ? "bg-scorch-soft text-scorch" : "text-ink-4 hover:bg-inset hover:text-ink")
+                  "relative grid size-9 place-items-center rounded-full transition " +
+                  (listening
+                    ? "bg-spark-soft text-spark"
+                    : "text-ink-4 hover:bg-inset hover:text-ink")
                 }
                 aria-label={listening ? "Stop dictation" : "Dictate your idea"}
                 title={listening ? "Stop dictation" : "Dictate instead of typing"}
               >
                 {listening ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+                {listening && <span className="forge-listening-ring absolute inset-0 rounded-full border border-spark/35" />}
               </button>
             )}
-            <span className="truncate text-[11px] text-ink-4">
-              {listening ? "Listening… speak naturally" : helper}
-            </span>
+
+            {listening && (
+              <div className="flex items-center gap-1" aria-label="Listening">
+                <span className="forge-wave h-2 w-0.5 rounded-full bg-spark [animation-delay:0ms]" />
+                <span className="forge-wave h-3.5 w-0.5 rounded-full bg-spark [animation-delay:90ms]" />
+                <span className="forge-wave h-2.5 w-0.5 rounded-full bg-spark [animation-delay:180ms]" />
+                <span className="forge-wave h-4 w-0.5 rounded-full bg-spark [animation-delay:270ms]" />
+              </div>
+            )}
           </div>
 
           <button
             type="submit"
             disabled={!f.composer.trim() || f.generating}
-            className="grid size-9 shrink-0 place-items-center rounded-xl bg-ink text-canvas transition enabled:hover:-translate-y-0.5 enabled:hover:shadow-sm disabled:opacity-30"
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-ink text-canvas transition-transform duration-150 enabled:hover:scale-[1.04] enabled:active:scale-[0.97] disabled:opacity-25"
             aria-label="Send to Forge"
           >
-            <ArrowUp className="size-4" />
+            <ArrowUp className="size-4.5" />
           </button>
         </div>
       </div>
