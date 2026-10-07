@@ -296,10 +296,9 @@ function structuredFormat(mode: TurnMode) {
           properties: {
             reply: { type: "string" },
             productName: { type: "string" },
-            productModel: productModelSchema,
             theses: { type: "array", items: thesisSchema, minItems: 3, maxItems: 3 },
           },
-          required: ["reply", "productName", "productModel", "theses"],
+          required: ["reply", "productName", "theses"],
         },
       },
     };
@@ -317,11 +316,9 @@ function structuredFormat(mode: TurnMode) {
           properties: {
             reply: { type: "string" },
             productName: { type: "string" },
-            productModel: productModelSchema,
-            theses: { type: "array", items: thesisSchema, minItems: 3, maxItems: 4 },
             spec: specSchema,
           },
-          required: ["reply", "productName", "productModel", "theses", "spec"],
+          required: ["reply", "productName", "spec"],
         },
       },
     };
@@ -497,7 +494,7 @@ async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
   const userMessage = typeof body.message === "string" ? body.message.trim() : "";
   const model = env.GEMINI_MODEL || "gemini-3.8-flash";
 
-  const response = await fetch("https://generativelanguage.googleapis.com/v1/interactions", {
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -512,7 +509,7 @@ async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
         thinking_level: mode === "chat" ? "low" : mode === "prototype" ? "high" : mode === "research" ? "medium" : "medium",
         max_output_tokens: mode === "prototype" ? 24000 : mode === "chat" ? 6000 : 10000,
       },
-      ...(mode === "research" ? { tools: [{ type: "google_search" }] } : {}),
+      ...(mode === "research" ? { tools: [{ type: "google_search" }, { type: "url_context" }] } : {}),
       response_format: {
         type: "text",
         mime_type: "application/json",
@@ -524,10 +521,14 @@ async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     console.error("Gemini turn failed", response.status, response.headers.get("x-request-id"), detail.slice(0, 400));
+    const safeDetail = detail
+      .replace(/AIza[0-9A-Za-z_-]+/g, "[redacted]")
+      .slice(0, 220);
+
     return {
       error: response.status === 429
         ? "Forge is busy right now. Your work is saved. Retry in a moment."
-        : "Forge could not complete this reasoning step. Your work is saved.",
+        : `Forge could not complete this reasoning step (Gemini ${response.status}). ${safeDetail || "Your work is saved."}`,
     };
   }
 
@@ -538,6 +539,10 @@ async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
       content?: Array<{ type?: string; text?: string }>;
     }>;
   };
+
+  if (payload.status === "failed" || payload.status === "cancelled") {
+    return { error: "Gemini could not complete this reasoning step. Your work is saved." };
+  }
 
   const outputText = payload.steps
     ?.filter((step) => step.type === "model_output")
