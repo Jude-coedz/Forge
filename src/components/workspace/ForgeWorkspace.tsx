@@ -7,23 +7,21 @@ import {
   Code2,
   Copy,
   ExternalLink,
-  FileText,
   Lightbulb,
   Monitor,
   Pencil,
   RefreshCw,
   Search,
-  Send,
   Smartphone,
-  Sparkles,
   X,
 } from "lucide-react";
-import { clock } from "../../lib/id";
 import { useForge } from "../../store/ForgeContext";
 import type { Conversation, ProductModel, ThesisOption } from "../../types";
 import { Button, Pill, SeverityBadge } from "../ui/primitives";
+import { Composer } from "../chat/Composer";
 
 type ArtifactTab = "model" | "research" | "directions" | "brief" | "prototype";
+type EditableField = "summary" | "primaryUser" | "currentWorkaround" | "opportunity" | "desiredOutcome";
 
 export function ForgeWorkspace() {
   const f = useForge();
@@ -39,7 +37,7 @@ export function ForgeWorkspace() {
     else if (conv.theses.length > 0) setTab("directions");
     else if (conv.research) setTab("research");
     else setTab("model");
-  }, [conv?.id, conv?.prototype?.builtAt, conv?.spec, conv?.theses.length]);
+  }, [conv?.id, conv?.prototype?.builtAt, conv?.spec, conv?.theses.length, conv?.research?.researchedAt]);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -60,54 +58,46 @@ export function ForgeWorkspace() {
     <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface lg:flex-row">
       <div className="flex shrink-0 border-b border-line bg-canvas px-3 py-2 lg:hidden">
         <div className="flex rounded-lg bg-inset p-0.5">
-          <button
-            type="button"
-            onClick={() => setMobilePane("chat")}
-            className={"rounded-md px-3 py-1.5 text-[12px] font-medium transition " + (mobilePane === "chat" ? "bg-raised text-ink shadow-sm" : "text-ink-4")}
-          >
+          <MobilePaneButton active={mobilePane === "chat"} onClick={() => setMobilePane("chat")}>
             Chat
-          </button>
-          <button
-            type="button"
-            onClick={() => setMobilePane("canvas")}
-            className={"rounded-md px-3 py-1.5 text-[12px] font-medium transition " + (mobilePane === "canvas" ? "bg-raised text-ink shadow-sm" : "text-ink-4")}
-          >
+          </MobilePaneButton>
+          <MobilePaneButton active={mobilePane === "canvas"} onClick={() => setMobilePane("canvas")}>
             Canvas
-          </button>
+          </MobilePaneButton>
         </div>
       </div>
 
-      <section className={(mobilePane === "chat" ? "flex" : "hidden") + " min-h-0 w-full min-w-0 flex-1 flex-col lg:flex lg:w-[420px] lg:shrink-0 lg:flex-none lg:border-r xl:w-[480px]"}>
-        <div className="shrink-0 border-b border-line px-4 py-3.5 sm:px-5">
-          <p className="text-[13px] font-medium text-ink">Forge</p>
-          <p className="mt-0.5 text-[12px] text-ink-4">Use chat for reasoning. Use the canvas to inspect and edit the product itself.</p>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 scrollbar-thin sm:px-5">
-          <div className="space-y-6">
+      <section className={(mobilePane === "chat" ? "flex" : "hidden") + " min-h-0 w-full min-w-0 flex-1 flex-col bg-surface lg:flex lg:w-[440px] lg:flex-none lg:border-r xl:w-[490px]"}>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-7 scrollbar-thin sm:px-7">
+          <div className="mx-auto max-w-[640px] space-y-7">
             {conv.messages.map((message) => {
               const isUser = message.role === "user";
               return (
-                <div key={message.id} className={isUser ? "pl-8" : "pr-3"}>
-                  <div className="mb-1.5 flex items-center gap-2">
-                    <span className={"text-[11px] font-medium " + (isUser ? "text-ink-4" : "text-spark")}>
-                      {isUser ? "You" : "Forge"}
-                    </span>
-                    <span className="text-[10px] text-ink-4/70">{clock(message.createdAt)}</span>
-                  </div>
-                  <div className={isUser ? "rounded-[16px] bg-inset px-3.5 py-3" : ""}>
-                    <p className="whitespace-pre-wrap text-[14px] leading-6 text-ink-2">{message.text}</p>
-                  </div>
+                <div key={message.id} className={isUser ? "flex justify-end" : ""}>
+                  {isUser ? (
+                    <div className="max-w-[88%] rounded-[18px] bg-inset px-4 py-3.5">
+                      <p className="whitespace-pre-wrap text-[16px] leading-7 text-ink-2">{message.text}</p>
+                    </div>
+                  ) : (
+                    <div className="forge-message-enter max-w-[94%]">
+                      <p className="mb-2 text-[12px] font-medium text-spark">Forge</p>
+                      <p className="whitespace-pre-wrap text-[16px] leading-7 text-ink-2">{message.text}</p>
+                    </div>
+                  )}
                 </div>
               );
             })}
 
             {f.generating && (
-              <div className="pr-4">
-                <div className="mb-1.5 text-[11px] font-medium text-spark">Forge</div>
-                <div className="flex items-center gap-2 text-[13px] text-ink-4">
-                  <span className="forge-thinking-dot size-2 rounded-full bg-spark" />
-                  <span>Working through the product…</span>
+              <div className="forge-message-enter">
+                <p className="mb-2 text-[12px] font-medium text-spark">Forge</p>
+                <div className="flex items-center gap-2.5 text-[14px] text-ink-4">
+                  <span className="flex items-center gap-1" aria-hidden>
+                    <span className="forge-thinking-dot size-1.5 rounded-full bg-spark [animation-delay:0ms]" />
+                    <span className="forge-thinking-dot size-1.5 rounded-full bg-spark [animation-delay:120ms]" />
+                    <span className="forge-thinking-dot size-1.5 rounded-full bg-spark [animation-delay:240ms]" />
+                  </span>
+                  Thinking through the product
                 </div>
               </div>
             )}
@@ -115,36 +105,21 @@ export function ForgeWorkspace() {
             {!f.generating && openDecision && !conv.spec && (
               <DecisionPrompt decision={openDecision} />
             )}
+
             <div ref={bottom} />
           </div>
         </div>
 
-        <WorkspaceComposer
-          placeholder={openDecision ? "Answer this in your own words, or keep it uncertain…" : "Add context, correct Forge, or challenge the thinking…"}
-        />
+        <div className="shrink-0 border-t border-line bg-canvas/92 p-3.5 backdrop-blur-xl">
+          <Composer
+            compact
+            placeholder={openDecision ? "Answer the open question, correct Forge, or add more context…" : "Add context, challenge the thinking, or correct anything Forge got wrong…"}
+          />
+        </div>
       </section>
 
-      <section className="hidden min-h-0 min-w-0 flex-1 flex-col lg:flex">
-        <div className="flex h-[49px] shrink-0 items-center justify-between border-b border-line bg-raised/60 px-5">
-          <div className="flex items-center gap-1">
-            {tabs.filter((item) => item.available).map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setTab(item.id)}
-                className={
-                  "relative rounded-lg px-3 py-1.5 text-[12px] font-medium transition " +
-                  (tab === item.id ? "text-ink" : "text-ink-4 hover:text-ink-2")
-                }
-              >
-                {item.label}
-                {tab === item.id && <span className="absolute inset-x-3 -bottom-[9px] h-px bg-ink" />}
-              </button>
-            ))}
-          </div>
-          <ArtifactActions conv={conv} tab={tab} />
-        </div>
-
+      <section className="hidden min-h-0 min-w-0 flex-1 flex-col bg-raised/20 lg:flex">
+        <CanvasTabs tabs={tabs} active={tab} onChange={setTab} />
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
           {tab === "model" && <ModelArtifact conv={conv} />}
           {tab === "research" && <ResearchArtifact conv={conv} />}
@@ -155,44 +130,66 @@ export function ForgeWorkspace() {
       </section>
 
       <section className={(mobilePane === "canvas" ? "flex" : "hidden") + " min-h-0 min-w-0 flex-1 flex-col lg:hidden"}>
-        <MobileArtifact conv={conv} tab={tab} setTab={setTab} />
+        <CanvasTabs tabs={tabs} active={tab} onChange={setTab} compact />
+        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+          {tab === "model" && <ModelArtifact conv={conv} />}
+          {tab === "research" && <ResearchArtifact conv={conv} />}
+          {tab === "directions" && <DirectionsArtifact conv={conv} />}
+          {tab === "brief" && <BriefArtifact conv={conv} />}
+          {tab === "prototype" && <PrototypeArtifact conv={conv} />}
+        </div>
       </section>
     </main>
   );
 }
 
-function WorkspaceComposer({ placeholder }: { placeholder: string }) {
-  const f = useForge();
-
+function MobilePaneButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
-    <div className="shrink-0 border-t border-line bg-canvas/90 p-3 backdrop-blur-xl">
-      <div className="rounded-[18px] border border-line-strong bg-raised p-2 shadow-sm transition focus-within:border-spark/35">
-        <textarea
-          value={f.composer}
-          onChange={(event) => f.setComposer(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              f.sendChat();
-            }
-          }}
-          rows={3}
-          placeholder={placeholder}
-          className="w-full resize-none bg-transparent px-2 pt-1 text-[15px] leading-6 text-ink outline-none placeholder:text-ink-4 focus-visible:outline-none"
-        />
-        <div className="flex items-center justify-between gap-3 px-1 pb-0.5 pt-1">
-          <span className="text-[11px] text-ink-4">Shift + Enter for a new line</span>
-          <button
-            type="button"
-            onClick={() => f.sendChat()}
-            disabled={!f.composer.trim() || f.generating}
-            className="grid size-8 place-items-center rounded-xl bg-ink text-canvas transition enabled:hover:-translate-y-0.5 disabled:opacity-30"
-            aria-label="Send to Forge"
-          >
-            <Send className="size-3.5" />
-          </button>
-        </div>
-      </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={"rounded-md px-3 py-1.5 text-[13px] font-medium transition " + (active ? "bg-raised text-ink shadow-sm" : "text-ink-4")}
+    >
+      {children}
+    </button>
+  );
+}
+
+function CanvasTabs({
+  tabs,
+  active,
+  onChange,
+  compact = false,
+}: {
+  tabs: Array<{ id: ArtifactTab; label: string; available: boolean }>;
+  active: ArtifactTab;
+  onChange: (tab: ArtifactTab) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={"flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-surface/80 backdrop-blur " + (compact ? "px-3 py-2" : "h-[52px] px-7")}>
+      {tabs.filter((item) => item.available).map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          onClick={() => onChange(item.id)}
+          className={
+            "relative shrink-0 rounded-lg px-3 py-1.5 text-[14px] font-medium transition-colors " +
+            (active === item.id ? "text-ink" : "text-ink-4 hover:text-ink-2")
+          }
+        >
+          {item.label}
+          {active === item.id && <span className="absolute inset-x-3 -bottom-[9px] h-px bg-ink" />}
+        </button>
+      ))}
     </div>
   );
 }
@@ -201,29 +198,29 @@ function DecisionPrompt({ decision }: { decision: ProductModel["decisions"][numb
   const f = useForge();
 
   return (
-    <div className="rounded-[16px] border border-line-strong bg-raised p-4">
-      <div className="flex items-center gap-2 text-[11px] font-medium text-molten">
+    <div className="forge-message-enter border-l-2 border-molten/45 pl-4">
+      <div className="flex items-center gap-2 text-[12px] font-medium text-molten">
         <Lightbulb className="size-3.5" />
-        Worth clarifying
+        One decision changes the product
       </div>
-      <p className="mt-2 text-[14px] font-medium leading-5 text-ink">{decision.question}</p>
-      {decision.rationale && <p className="mt-1.5 text-[12px] leading-5 text-ink-4">{decision.rationale}</p>}
+      <p className="mt-2 text-[16px] font-medium leading-7 text-ink">{decision.question}</p>
+      {decision.rationale && <p className="mt-1.5 text-[14px] leading-6 text-ink-4">{decision.rationale}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         {decision.recommendation && (
           <button
             type="button"
             onClick={() => f.sendChat(`Use your recommendation for this decision: ${decision.recommendation}. Keep the choice reversible where possible.`)}
-            className="rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-medium text-ink-3 transition hover:border-line-strong hover:text-ink"
+            className="rounded-lg bg-inset px-3 py-1.5 text-[13px] font-medium text-ink-2 transition hover:bg-line-strong"
           >
-            Use Forge's recommendation
+            Use Forge's suggestion
           </button>
         )}
         <button
           type="button"
           onClick={() => f.sendChat("I do not know this yet. Keep it as an explicit assumption and continue using the most reversible option.")}
-          className="rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[11px] font-medium text-ink-3 transition hover:border-line-strong hover:text-ink"
+          className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-ink-4 transition hover:bg-inset hover:text-ink"
         >
-          I don't know yet
+          Keep it uncertain
         </button>
       </div>
     </div>
@@ -234,237 +231,261 @@ function ModelArtifact({ conv }: { conv: Conversation }) {
   const f = useForge();
   const model = conv.productModel;
   const hasModel = Boolean(model.summary || model.opportunity || model.primaryUser || model.desiredOutcome);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({
-    summary: model.summary,
-    primaryUser: model.primaryUser,
-    currentWorkaround: model.currentWorkaround,
-    opportunity: model.opportunity,
-    desiredOutcome: model.desiredOutcome,
-  });
+  const [editing, setEditing] = useState<EditableField | null>(null);
+  const [draft, setDraft] = useState("");
 
-  useEffect(() => {
-    if (editing) return;
-    setDraft({
-      summary: model.summary,
-      primaryUser: model.primaryUser,
-      currentWorkaround: model.currentWorkaround,
-      opportunity: model.opportunity,
-      desiredOutcome: model.desiredOutcome,
-    });
-  }, [
-    editing,
-    model.summary,
-    model.primaryUser,
-    model.currentWorkaround,
-    model.opportunity,
-    model.desiredOutcome,
-  ]);
+  if (!hasModel && f.generating) return <ArtifactSkeleton />;
 
-  if (!hasModel && f.generating) {
-    return <ArtifactSkeleton />;
-  }
+  const beginEdit = (field: EditableField, value: string) => {
+    setEditing(field);
+    setDraft(value);
+  };
 
-  const save = () => {
-    f.updateProductModelFields(draft);
-    setEditing(false);
+  const saveEdit = () => {
+    if (!editing) return;
+    f.updateProductModelFields({ [editing]: draft } as Partial<Pick<ProductModel, EditableField>>);
+    setEditing(null);
   };
 
   return (
-    <div className="mx-auto w-full max-w-[900px] px-7 py-9 xl:px-12 xl:py-11">
-      <div className="flex flex-wrap items-start justify-between gap-5">
-        <div className="max-w-[700px]">
-          <p className="text-[12px] font-medium text-ink-4">Current understanding</p>
-          <h1 className="mt-2 text-[32px] font-medium leading-[1.15] tracking-[-0.035em] text-ink">
-            {conv.productName || conv.title || "Untitled idea"}
-          </h1>
-          {!editing && model.summary && (
-            <p className="mt-4 text-[18px] leading-8 text-ink-2">{model.summary}</p>
-          )}
-        </div>
+    <div className="forge-content-enter mx-auto w-full max-w-[940px] px-7 py-9 xl:px-12 xl:py-12">
+      <div className="max-w-[760px]">
+        <p className="text-[13px] font-medium text-ink-4">Current hypothesis</p>
+        <h1 className="mt-2 text-[36px] font-[480] leading-[1.12] tracking-[-0.04em] text-ink">
+          {conv.productName || conv.title || "Untitled idea"}
+        </h1>
 
-        {!editing ? (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium text-ink-4 transition hover:bg-inset hover:text-ink"
+        <EditableText
+          field="summary"
+          label="Summary"
+          value={model.summary}
+          editing={editing}
+          draft={draft}
+          onBegin={beginEdit}
+          onDraft={setDraft}
+          onSave={saveEdit}
+          onCancel={() => setEditing(null)}
+          prominent
+        />
+
+        <div className="mt-7 flex flex-wrap gap-2">
+          <Button variant="secondary" disabled={f.generating || !hasModel} onClick={f.researchIdea}>
+            <Search className="size-4" />
+            {f.generating ? "Working…" : conv.research ? "Refresh research" : "Research the market"}
+          </Button>
+          <Button variant="primary" disabled={f.generating || !hasModel} onClick={f.advanceToDirections}>
+            Explore directions
+            <ArrowRight className="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-10 max-w-[840px] border-y border-line">
+        <EditableText
+          field="primaryUser"
+          label="Who has this problem?"
+          value={model.primaryUser}
+          editing={editing}
+          draft={draft}
+          onBegin={beginEdit}
+          onDraft={setDraft}
+          onSave={saveEdit}
+          onCancel={() => setEditing(null)}
+        />
+        <EditableText
+          field="currentWorkaround"
+          label="What happens today?"
+          value={model.currentWorkaround}
+          editing={editing}
+          draft={draft}
+          onBegin={beginEdit}
+          onDraft={setDraft}
+          onSave={saveEdit}
+          onCancel={() => setEditing(null)}
+        />
+        <EditableText
+          field="opportunity"
+          label="What is actually broken?"
+          value={model.opportunity}
+          editing={editing}
+          draft={draft}
+          onBegin={beginEdit}
+          onDraft={setDraft}
+          onSave={saveEdit}
+          onCancel={() => setEditing(null)}
+        />
+        <EditableText
+          field="desiredOutcome"
+          label="What would better look like?"
+          value={model.desiredOutcome}
+          editing={editing}
+          draft={draft}
+          onBegin={beginEdit}
+          onDraft={setDraft}
+          onSave={saveEdit}
+          onCancel={() => setEditing(null)}
+        />
+      </div>
+
+      {(model.evidence.length > 0 || model.assumptions.length > 0) && (
+        <div className="mt-9 max-w-[840px] divide-y divide-line border-t border-line">
+          <EvidenceDisclosure
+            title="Evidence already in the idea"
+            count={model.evidence.length}
+            tone="temper"
           >
-            <Pencil className="size-3.5" />
-            Edit
-          </button>
-        ) : (
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              className="grid size-8 place-items-center rounded-lg text-ink-4 transition hover:bg-inset hover:text-ink"
-              aria-label="Cancel editing"
-            >
-              <X className="size-4" />
-            </button>
-            <button
-              type="button"
-              onClick={save}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-ink px-3 text-[12px] font-medium text-canvas"
-            >
+            {model.evidence.length > 0 ? model.evidence.slice(0, 5).map((item) => (
+              <li key={item.id} className="flex gap-3 text-[15px] leading-7 text-ink-2">
+                <span className="mt-2.5 size-1.5 shrink-0 rounded-full bg-temper" />
+                <span>{item.claim}</span>
+              </li>
+            )) : <li className="text-[15px] leading-7 text-ink-4">No direct evidence has been added yet.</li>}
+          </EvidenceDisclosure>
+
+          <EvidenceDisclosure
+            title="Assumptions that still need proving"
+            count={model.assumptions.filter((item) => item.status === "untested").length}
+            tone="molten"
+          >
+            {model.assumptions.filter((item) => item.status === "untested").slice(0, 5).map((item) => (
+              <li key={item.id} className="flex gap-3 text-[15px] leading-7 text-ink-2">
+                <span className="mt-2.5 size-1.5 shrink-0 rounded-full bg-molten" />
+                <span>{item.claim}</span>
+              </li>
+            ))}
+          </EvidenceDisclosure>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EditableText({
+  field,
+  label,
+  value,
+  editing,
+  draft,
+  onBegin,
+  onDraft,
+  onSave,
+  onCancel,
+  prominent = false,
+}: {
+  field: EditableField;
+  label: string;
+  value: string;
+  editing: EditableField | null;
+  draft: string;
+  onBegin: (field: EditableField, value: string) => void;
+  onDraft: (value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  prominent?: boolean;
+}) {
+  if (!value && editing !== field) return null;
+
+  if (editing === field) {
+    return (
+      <div className={prominent ? "mt-5" : "grid gap-3 border-b border-line py-6 last:border-b-0 sm:grid-cols-[190px_1fr]"}>
+        {!prominent && <span className="pt-2 text-[13px] text-ink-4">{label}</span>}
+        <div>
+          <textarea
+            autoFocus
+            rows={prominent ? 3 : 4}
+            value={draft}
+            onChange={(event) => onDraft(event.target.value)}
+            className="w-full resize-y rounded-xl border border-line-strong bg-raised px-3.5 py-3 text-[16px] leading-7 text-ink outline-none focus:border-line-strong"
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <button type="button" onClick={onSave} className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-[12px] font-medium text-canvas">
               <Check className="size-3.5" />
               Save
             </button>
+            <button type="button" onClick={onCancel} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium text-ink-4 hover:bg-inset">
+              <X className="size-3.5" />
+              Cancel
+            </button>
           </div>
-        )}
+        </div>
       </div>
+    );
+  }
 
-      {editing ? (
-        <div className="mt-8 max-w-[820px] space-y-5">
-          <EditField
-            label="In one sentence"
-            value={draft.summary}
-            onChange={(value) => setDraft((current) => ({ ...current, summary: value }))}
-            rows={2}
-          />
-          <EditField
-            label="Who feels the problem?"
-            value={draft.primaryUser}
-            onChange={(value) => setDraft((current) => ({ ...current, primaryUser: value }))}
-          />
-          <EditField
-            label="What happens today?"
-            value={draft.currentWorkaround}
-            onChange={(value) => setDraft((current) => ({ ...current, currentWorkaround: value }))}
-          />
-          <EditField
-            label="What is actually not working?"
-            value={draft.opportunity}
-            onChange={(value) => setDraft((current) => ({ ...current, opportunity: value }))}
-          />
-          <EditField
-            label="What would a better outcome look like?"
-            value={draft.desiredOutcome}
-            onChange={(value) => setDraft((current) => ({ ...current, desiredOutcome: value }))}
-          />
-        </div>
-      ) : (
-        <div className="mt-9 max-w-[820px] divide-y divide-line border-y border-line">
-          <ModelRow label="Who feels the problem" value={model.primaryUser} />
-          <ModelRow label="What happens today" value={model.currentWorkaround} />
-          <ModelRow label="What is not working" value={model.opportunity} />
-          <ModelRow label="What better looks like" value={model.desiredOutcome} />
-        </div>
-      )}
+  if (prominent) {
+    return (
+      <div className="group relative mt-5 max-w-[760px] pr-9">
+        <p className="text-[19px] leading-8 text-ink-2">{value}</p>
+        <button
+          type="button"
+          onClick={() => onBegin(field, value)}
+          className="absolute right-0 top-1 grid size-7 place-items-center rounded-lg text-ink-4 opacity-0 transition group-hover:opacity-100 hover:bg-inset hover:text-ink focus:opacity-100"
+          aria-label={"Edit " + label}
+        >
+          <Pencil className="size-3.5" />
+        </button>
+      </div>
+    );
+  }
 
-      {!editing && (model.evidence.length > 0 || model.assumptions.length > 0) && (
-        <div className="mt-9 grid max-w-[860px] gap-8 md:grid-cols-2">
-          <ArtifactSection title="What supports the idea">
-            {model.evidence.length > 0 ? (
-              <div className="space-y-3">
-                {model.evidence.slice(0, 4).map((item) => (
-                  <div key={item.id} className="flex gap-3 text-[14px] leading-6 text-ink-2">
-                    <span className="mt-2 size-1.5 shrink-0 rounded-full bg-temper" />
-                    <span>{item.claim}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[14px] leading-6 text-ink-4">
-                No real evidence has been added yet. Forge is treating this as a working hypothesis.
-              </p>
-            )}
-          </ArtifactSection>
-
-          <ArtifactSection title="What still needs proving">
-            {model.assumptions.length > 0 ? (
-              <div className="space-y-3">
-                {model.assumptions.filter((item) => item.status === "untested").slice(0, 4).map((item) => (
-                  <div key={item.id} className="flex gap-3 text-[14px] leading-6 text-ink-2">
-                    <span className="mt-2 size-1.5 shrink-0 rounded-full bg-molten" />
-                    <span>{item.claim}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-[14px] leading-6 text-ink-4">
-                Forge has not identified a major unproven assumption yet.
-              </p>
-            )}
-          </ArtifactSection>
-        </div>
-      )}
-
-      {!editing && (
-        <div className="mt-11 max-w-[860px] rounded-[16px] border border-line bg-raised/55 px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-[13px] font-medium text-ink">Next useful move</p>
-              <p className="mt-1 text-[12px] leading-5 text-ink-4">
-                Compare genuinely different ways this product could solve the problem before deciding what to prototype.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="secondary" disabled={f.generating || !hasModel} onClick={f.researchIdea}>
-                <Search className="size-3.5" />
-                {conv.research ? "Refresh research" : "Research the market"}
-              </Button>
-              <Button variant="primary" disabled={f.generating || !hasModel} onClick={f.advanceToDirections}>
-                Explore directions
-                <ArrowRight className="size-3.5" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+  return (
+    <div className="group grid gap-2 border-b border-line py-6 last:border-b-0 sm:grid-cols-[190px_1fr] sm:gap-8">
+      <span className="text-[13px] text-ink-4">{label}</span>
+      <div className="relative pr-9">
+        <p className="text-[16px] leading-7 text-ink-2">{value}</p>
+        <button
+          type="button"
+          onClick={() => onBegin(field, value)}
+          className="absolute right-0 top-0 grid size-7 place-items-center rounded-lg text-ink-4 opacity-0 transition group-hover:opacity-100 hover:bg-inset hover:text-ink focus:opacity-100"
+          aria-label={"Edit " + label}
+        >
+          <Pencil className="size-3.5" />
+        </button>
+      </div>
     </div>
   );
 }
 
-function EditField({
-  label,
-  value,
-  onChange,
-  rows = 3,
+function EvidenceDisclosure({
+  title,
+  count,
+  tone,
+  children,
 }: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  rows?: number;
+  title: string;
+  count: number;
+  tone: "temper" | "molten";
+  children: ReactNode;
 }) {
   return (
-    <label className="block">
-      <span className="text-[12px] font-medium text-ink-4">{label}</span>
-      <textarea
-        rows={rows}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full resize-y rounded-[12px] border border-line-strong bg-raised px-3.5 py-3 text-[14px] leading-6 text-ink outline-none transition focus:border-spark/35"
-      />
-    </label>
-  );
-}
-
-function ModelRow({ label, value }: { label: string; value: string }) {
-  if (!value) return null;
-  return (
-    <div className="grid gap-2 py-5 sm:grid-cols-[180px_1fr] sm:gap-8">
-      <span className="text-[13px] text-ink-4">{label}</span>
-      <span className="text-[15px] leading-6 text-ink-2">{value}</span>
-    </div>
+    <details className="group py-5">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5">
+          <span className={"size-1.5 rounded-full " + (tone === "temper" ? "bg-temper" : "bg-molten")} />
+          <span className="text-[14px] font-medium text-ink-2">{title}</span>
+          <span className="text-[12px] text-ink-4">{count}</span>
+        </div>
+        <ChevronRight className="size-4 text-ink-4 transition-transform group-open:rotate-90" />
+      </summary>
+      <ul className="mt-4 space-y-2 pl-4">{children}</ul>
+    </details>
   );
 }
 
 function ResearchArtifact({ conv }: { conv: Conversation }) {
   const f = useForge();
   const research = conv.research;
-
   if (!research) return <ArtifactSkeleton />;
 
   return (
-    <div className="mx-auto w-full max-w-[940px] px-7 py-9 xl:px-12 xl:py-11">
+    <div className="forge-content-enter mx-auto w-full max-w-[960px] px-7 py-9 xl:px-12 xl:py-12">
       <div className="flex flex-wrap items-start justify-between gap-5">
-        <div className="max-w-[720px]">
-          <p className="text-[12px] font-medium text-ink-4">Current market evidence</p>
-          <h1 className="mt-2 text-[31px] font-medium leading-[1.16] tracking-[-0.035em] text-ink">
-            What changed after looking outside the idea
+        <div className="max-w-[740px]">
+          <p className="text-[13px] font-medium text-ink-4">Market check</p>
+          <h1 className="mt-2 text-[34px] font-[480] leading-[1.15] tracking-[-0.035em] text-ink">
+            What changes after looking outside the idea
           </h1>
-          <p className="mt-4 text-[16px] leading-7 text-ink-2">{research.summary}</p>
+          <p className="mt-4 text-[17px] leading-8 text-ink-2">{research.summary}</p>
         </div>
         <Button variant="secondary" size="sm" onClick={f.researchIdea} disabled={f.generating}>
           <RefreshCw className={"size-3.5 " + (f.generating ? "animate-spin" : "")} />
@@ -472,54 +493,54 @@ function ResearchArtifact({ conv }: { conv: Conversation }) {
         </Button>
       </div>
 
-      <div className="mt-9 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,.85fr)]">
-        <section>
-          <p className="text-[12px] font-medium text-ink-4">Signals</p>
+      <section className="mt-10 max-w-[860px]">
+        <p className="text-[13px] font-medium text-ink-4">Signals</p>
+        <div className="mt-3 divide-y divide-line border-y border-line">
+          {research.signals.map((signal, index) => (
+            <div key={signal.title + index} className="grid gap-3 py-5 sm:grid-cols-[110px_1fr] sm:gap-6">
+              <span className={
+                "mt-0.5 w-fit rounded-full px-2 py-0.5 text-[11px] font-medium " +
+                (signal.stance === "supports"
+                  ? "bg-temper-soft text-temper"
+                  : signal.stance === "challenges"
+                    ? "bg-scorch-soft text-scorch"
+                    : "bg-inset text-ink-4")
+              }>
+                {signal.stance === "supports" ? "Supports" : signal.stance === "challenges" ? "Challenges" : "Context"}
+              </span>
+              <div>
+                <p className="text-[15px] font-medium text-ink">{signal.title}</p>
+                <p className="mt-1 text-[14px] leading-7 text-ink-3">{signal.detail}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {research.alternatives.length > 0 && (
+        <section className="mt-9 max-w-[860px]">
+          <p className="text-[13px] font-medium text-ink-4">Existing alternatives and substitutes</p>
           <div className="mt-3 divide-y divide-line border-y border-line">
-            {research.signals.map((signal, index) => (
-              <div key={signal.title + index} className="grid gap-2 py-5 sm:grid-cols-[110px_1fr] sm:gap-5">
-                <span className={
-                  "mt-0.5 w-fit rounded-full px-2 py-0.5 text-[10px] font-medium " +
-                  (signal.stance === "supports"
-                    ? "bg-temper-soft text-temper"
-                    : signal.stance === "challenges"
-                      ? "bg-scorch-soft text-scorch"
-                      : "bg-inset text-ink-4")
-                }>
-                  {signal.stance === "supports" ? "Supports" : signal.stance === "challenges" ? "Challenges" : "Context"}
-                </span>
+            {research.alternatives.map((item) => (
+              <div key={item.name} className="grid gap-2 py-5 sm:grid-cols-[180px_1fr] sm:gap-6">
+                <p className="text-[15px] font-medium text-ink">{item.name}</p>
                 <div>
-                  <p className="text-[14px] font-medium text-ink">{signal.title}</p>
-                  <p className="mt-1 text-[13px] leading-6 text-ink-3">{signal.detail}</p>
+                  <p className="text-[14px] leading-6 text-ink-2">{item.description}</p>
+                  <p className="mt-1 text-[13px] leading-6 text-ink-4">{item.relevance}</p>
                 </div>
               </div>
             ))}
           </div>
         </section>
-
-        <section>
-          <p className="text-[12px] font-medium text-ink-4">Existing alternatives</p>
-          <div className="mt-3 space-y-3">
-            {research.alternatives.length > 0 ? research.alternatives.map((item) => (
-              <div key={item.name} className="rounded-[14px] border border-line bg-raised/60 p-4">
-                <p className="text-[13px] font-medium text-ink">{item.name}</p>
-                <p className="mt-1 text-[12px] leading-5 text-ink-3">{item.description}</p>
-                <p className="mt-2 text-[11px] leading-5 text-ink-4">{item.relevance}</p>
-              </div>
-            )) : (
-              <p className="text-[13px] leading-6 text-ink-4">No directly relevant alternative was strong enough to include.</p>
-            )}
-          </div>
-        </section>
-      </div>
+      )}
 
       {research.unresolved.length > 0 && (
-        <section className="mt-9 rounded-[16px] border border-molten/20 bg-molten-soft/35 p-5">
-          <p className="text-[12px] font-medium text-molten">Search still cannot prove</p>
-          <ul className="mt-3 space-y-2">
+        <section className="mt-9 max-w-[860px]">
+          <p className="text-[13px] font-medium text-molten">Search still cannot prove</p>
+          <ul className="mt-3 space-y-2.5">
             {research.unresolved.map((item) => (
-              <li key={item} className="flex gap-3 text-[13px] leading-6 text-ink-2">
-                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-molten" />
+              <li key={item} className="flex gap-3 text-[15px] leading-7 text-ink-2">
+                <span className="mt-2.5 size-1.5 shrink-0 rounded-full bg-molten" />
                 <span>{item}</span>
               </li>
             ))}
@@ -528,8 +549,8 @@ function ResearchArtifact({ conv }: { conv: Conversation }) {
       )}
 
       {research.sources.length > 0 && (
-        <section className="mt-9 border-t border-line pt-6">
-          <p className="text-[12px] font-medium text-ink-4">Sources</p>
+        <section className="mt-9 max-w-[860px] border-t border-line pt-6">
+          <p className="text-[13px] font-medium text-ink-4">Sources</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {research.sources.map((source, index) => (
               <a
@@ -537,9 +558,9 @@ function ResearchArtifact({ conv }: { conv: Conversation }) {
                 href={source.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 py-1.5 text-[11px] text-ink-3 transition hover:border-line-strong hover:text-ink"
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 py-1.5 text-[12px] text-ink-3 transition hover:border-line-strong hover:text-ink"
               >
-                <span className="max-w-[240px] truncate">{source.title || new URL(source.url).hostname}</span>
+                <span className="max-w-[260px] truncate">{source.title || new URL(source.url).hostname}</span>
                 <ExternalLink className="size-3 shrink-0" />
               </a>
             ))}
@@ -547,25 +568,13 @@ function ResearchArtifact({ conv }: { conv: Conversation }) {
         </section>
       )}
 
-      <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
-        <p className="max-w-xl text-[12px] leading-5 text-ink-4">
-          External evidence changes the hypothesis; it does not automatically prove demand or willingness to switch.
-        </p>
+      <div className="mt-10 max-w-[860px] border-t border-line pt-6">
         <Button variant="primary" disabled={f.generating} onClick={f.advanceToDirections}>
           Explore directions
-          <ArrowRight className="size-3.5" />
+          <ArrowRight className="size-4" />
         </Button>
       </div>
     </div>
-  );
-}
-
-function ArtifactSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section>
-      <p className="mb-4 text-[12px] font-medium text-ink-4">{title}</p>
-      {children}
-    </section>
   );
 }
 
@@ -574,16 +583,16 @@ function DirectionsArtifact({ conv }: { conv: Conversation }) {
   const selected = conv.theses.find((item) => item.id === conv.selectedThesis);
 
   return (
-    <div className="mx-auto w-full max-w-[980px] px-8 py-10 xl:px-12 xl:py-12">
-      <div className="max-w-[720px]">
-        <p className="text-[12px] font-medium text-ink-4">Product directions</p>
-        <h1 className="mt-2 text-[32px] font-medium tracking-[-0.035em] text-ink">Three ways this product could work.</h1>
-        <p className="mt-3 text-[15px] leading-7 text-ink-3">
-          Forge is keeping the options meaningfully different so you can choose a product mechanism, not a blended feature list.
+    <div className="forge-content-enter mx-auto w-full max-w-[980px] px-7 py-9 xl:px-12 xl:py-12">
+      <div className="max-w-[760px]">
+        <p className="text-[13px] font-medium text-ink-4">Directions</p>
+        <h1 className="mt-2 text-[34px] font-[480] tracking-[-0.035em] text-ink">Three ways this product could work.</h1>
+        <p className="mt-3 text-[16px] leading-7 text-ink-3">
+          These differ by product mechanism, not just feature scope. Choose the one you believe is most worth testing.
         </p>
       </div>
 
-      <div className="mt-9 overflow-hidden rounded-[16px] border border-line-strong bg-raised">
+      <div className="mt-9 overflow-hidden border-y border-line">
         {conv.theses.map((option, index) => (
           <DirectionRow
             key={option.id}
@@ -595,17 +604,17 @@ function DirectionsArtifact({ conv }: { conv: Conversation }) {
         ))}
       </div>
 
-      <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
+      <div className="mt-7 flex flex-wrap items-center justify-between gap-4">
         <button
           type="button"
           onClick={() => f.setComposer("These directions are missing something important. Here is what Forge has not accounted for: ")}
-          className="text-[13px] font-medium text-ink-4 transition hover:text-ink"
+          className="text-[14px] font-medium text-ink-4 transition hover:text-ink"
         >
           None of these feel right
         </button>
         <Button variant="primary" disabled={!selected || f.generating} onClick={f.lockThesis}>
           {f.generating ? "Building the brief…" : selected ? `Choose ${selected.title}` : "Choose a direction"}
-          {!f.generating && <ChevronRight className="size-3.5" />}
+          {!f.generating && <ChevronRight className="size-4" />}
         </Button>
       </div>
     </div>
@@ -628,8 +637,8 @@ function DirectionRow({
       type="button"
       onClick={onSelect}
       className={
-        "grid w-full gap-5 border-b border-line p-5 text-left transition last:border-b-0 md:grid-cols-[44px_1.2fr_1fr_1fr] md:items-start " +
-        (selected ? "bg-spark-soft/50" : "hover:bg-canvas/70")
+        "grid w-full gap-5 border-b border-line px-1 py-6 text-left transition-colors last:border-b-0 md:grid-cols-[44px_1.25fr_1fr_1fr] md:items-start " +
+        (selected ? "bg-spark-soft/45" : "hover:bg-inset/45")
       }
     >
       <span className={
@@ -640,18 +649,18 @@ function DirectionRow({
       </span>
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[16px] font-medium text-ink">{option.title}</p>
+          <p className="text-[17px] font-medium text-ink">{option.title}</p>
           {option.recommended && <Pill tone="spark">Forge pick</Pill>}
         </div>
-        <p className="mt-1.5 text-[13px] leading-6 text-ink-3">{option.description}</p>
+        <p className="mt-1.5 text-[14px] leading-6 text-ink-3">{option.description}</p>
       </div>
       <div>
-        <p className="text-[11px] font-medium text-ink-4">Why it could win</p>
-        <p className="mt-2 text-[13px] leading-5 text-ink-2">{option.pros[0] || "No clear advantage captured."}</p>
+        <p className="text-[12px] font-medium text-ink-4">Why it could win</p>
+        <p className="mt-2 text-[14px] leading-6 text-ink-2">{option.pros[0] || "No clear advantage captured."}</p>
       </div>
       <div>
-        <p className="text-[11px] font-medium text-ink-4">Biggest risk</p>
-        <p className="mt-2 text-[13px] leading-5 text-ink-2">{option.risks[0] || "No major risk captured."}</p>
+        <p className="text-[12px] font-medium text-ink-4">Biggest risk</p>
+        <p className="mt-2 text-[14px] leading-6 text-ink-2">{option.risks[0] || "No major risk captured."}</p>
       </div>
     </button>
   );
@@ -665,16 +674,16 @@ function BriefArtifact({ conv }: { conv: Conversation }) {
   const p0 = spec.requirements.filter((item) => item.priority === "P0");
 
   return (
-    <div className="mx-auto w-full max-w-[900px] px-8 py-10 xl:px-12 xl:py-12">
+    <div className="forge-content-enter mx-auto w-full max-w-[940px] px-7 py-9 xl:px-12 xl:py-12">
       <div className="flex flex-wrap items-start justify-between gap-5">
-        <div className="max-w-[680px]">
-          <p className="text-[12px] font-medium text-ink-4">Build brief</p>
-          <h1 className="mt-2 text-[32px] font-medium tracking-[-0.035em] text-ink">{spec.productName}</h1>
-          <p className="mt-3 text-[17px] leading-8 text-ink-2">{spec.overview}</p>
+        <div className="max-w-[700px]">
+          <p className="text-[13px] font-medium text-ink-4">Build brief</p>
+          <h1 className="mt-2 text-[34px] font-[480] tracking-[-0.035em] text-ink">{spec.productName}</h1>
+          <p className="mt-4 text-[17px] leading-8 text-ink-2">{spec.overview}</p>
         </div>
         <Button variant="secondary" size="sm" onClick={f.copySpec}>
           <ClipboardCopy className="size-3.5" />
-          Copy brief
+          Copy
         </Button>
       </div>
 
@@ -687,10 +696,10 @@ function BriefArtifact({ conv }: { conv: Conversation }) {
           <div className="space-y-5">
             {p0.map((item, index) => (
               <div key={item.id} className="grid gap-2 sm:grid-cols-[30px_1fr]">
-                <span className="font-mono text-[10px] text-ink-4">{String(index + 1).padStart(2, "0")}</span>
+                <span className="font-mono text-[11px] text-ink-4">{String(index + 1).padStart(2, "0")}</span>
                 <div>
-                  <p className="text-[15px] font-medium text-ink">{item.name}</p>
-                  <p className="mt-1 text-[13px] leading-6 text-ink-3">{item.story}</p>
+                  <p className="text-[16px] font-medium text-ink">{item.name}</p>
+                  <p className="mt-1 text-[14px] leading-6 text-ink-3">{item.story}</p>
                 </div>
               </div>
             ))}
@@ -700,7 +709,7 @@ function BriefArtifact({ conv }: { conv: Conversation }) {
         <BriefBlock title="Explicitly not V1">
           <ul className="space-y-2">
             {spec.nonGoals.map((item) => (
-              <li key={item} className="flex gap-3 text-[14px] leading-6 text-ink-2">
+              <li key={item} className="flex gap-3 text-[15px] leading-7 text-ink-2">
                 <span className="text-ink-4">—</span>
                 <span>{item}</span>
               </li>
@@ -709,22 +718,22 @@ function BriefArtifact({ conv }: { conv: Conversation }) {
         </BriefBlock>
 
         {(spec.failureModes.length > 0 || spec.validationPlan.length > 0) && (
-          <BriefBlock title="Do not lose sight of">
+          <BriefBlock title="Keep visible">
             <div className="grid gap-6 md:grid-cols-2">
               {spec.failureModes.slice(0, 3).map((item) => (
                 <div key={item.id}>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-[13px] font-medium text-ink">{item.title}</p>
+                    <p className="text-[14px] font-medium text-ink">{item.title}</p>
                     <SeverityBadge value={item.severity} />
                   </div>
-                  <p className="mt-1 text-[12px] leading-5 text-ink-4">{item.containment}</p>
+                  <p className="mt-1 text-[13px] leading-6 text-ink-4">{item.containment}</p>
                 </div>
               ))}
               {spec.validationPlan.slice(0, 2).map((item, index) => (
                 <div key={item.assumption + index}>
-                  <p className="text-[11px] font-medium text-molten">Unproven assumption</p>
-                  <p className="mt-1 text-[13px] leading-5 text-ink-2">{item.assumption}</p>
-                  <p className="mt-1 text-[12px] leading-5 text-ink-4">Test: {item.test}</p>
+                  <p className="text-[12px] font-medium text-molten">Unproven assumption</p>
+                  <p className="mt-1 text-[14px] leading-6 text-ink-2">{item.assumption}</p>
+                  <p className="mt-1 text-[13px] leading-6 text-ink-4">Test: {item.test}</p>
                 </div>
               ))}
             </div>
@@ -732,13 +741,10 @@ function BriefArtifact({ conv }: { conv: Conversation }) {
         )}
       </div>
 
-      <div className="mt-7 flex flex-wrap items-center justify-between gap-4">
-        <p className="max-w-lg text-[13px] leading-5 text-ink-4">
-          The prototype should test the core interaction in this brief, not decorate it.
-        </p>
+      <div className="mt-7">
         <Button variant="primary" onClick={f.buildPrototype} disabled={f.generating}>
           {f.generating ? "Building prototype…" : conv.prototype ? "Regenerate prototype" : "Build working prototype"}
-          {!f.generating && <Code2 className="size-3.5" />}
+          {!f.generating && <Code2 className="size-4" />}
         </Button>
       </div>
     </div>
@@ -748,7 +754,7 @@ function BriefArtifact({ conv }: { conv: Conversation }) {
 function BriefBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="grid gap-5 border-b border-line py-7 last:border-b-0 md:grid-cols-[170px_1fr]">
-      <p className="text-[12px] font-medium text-ink-4">{title}</p>
+      <p className="text-[13px] font-medium text-ink-4">{title}</p>
       <div>{children}</div>
     </section>
   );
@@ -763,11 +769,11 @@ function PrototypeArtifact({ conv }: { conv: Conversation }) {
   if (!prototype) return <ArtifactSkeleton />;
 
   return (
-    <div className="flex min-h-full flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
+    <div className="forge-content-enter flex min-h-full flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
         <div>
-          <p className="text-[13px] font-medium text-ink">Working prototype</p>
-          <p className="mt-0.5 text-[11px] text-ink-4">{prototype.summary}</p>
+          <p className="text-[14px] font-medium text-ink">Working prototype</p>
+          <p className="mt-0.5 max-w-2xl text-[12px] text-ink-4">{prototype.summary}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-line bg-canvas p-0.5">
@@ -789,10 +795,10 @@ function PrototypeArtifact({ conv }: { conv: Conversation }) {
         </div>
       </div>
 
-      <div className="flex min-h-[680px] flex-1 items-start justify-center overflow-auto bg-[#ececeb] p-4 dark:bg-[#11110f]">
+      <div className="flex min-h-[680px] flex-1 items-start justify-center overflow-auto bg-[#ecebe7] p-4 dark:bg-[#11110f]">
         <div
           className={
-            "overflow-hidden bg-white shadow-[0_30px_80px_-45px_rgba(0,0,0,.45)] transition-[width,border-radius] duration-300 " +
+            "overflow-hidden bg-white shadow-[0_30px_80px_-45px_rgba(0,0,0,.38)] transition-[width,border-radius] duration-300 " +
             (viewport === "mobile"
               ? "h-[720px] w-[390px] max-w-full rounded-[28px] border-[7px] border-[#1e1e1d]"
               : "h-[720px] w-full max-w-[1200px] rounded-xl border border-black/10")
@@ -834,93 +840,22 @@ function PreviewButton({
   );
 }
 
-function ArtifactActions({ conv, tab }: { conv: Conversation; tab: ArtifactTab }) {
-  const f = useForge();
-
-  if (tab === "brief" && conv.spec) {
-    return (
-      <button type="button" onClick={f.copySpec} className="flex items-center gap-1.5 text-[11px] font-medium text-ink-4 hover:text-ink">
-        <FileText className="size-3.5" />
-        Copy brief
-      </button>
-    );
-  }
-
-  if (tab === "prototype" && conv.prototype) {
-    return (
-      <button type="button" onClick={f.copyPrototype} className="flex items-center gap-1.5 text-[11px] font-medium text-ink-4 hover:text-ink">
-        <Code2 className="size-3.5" />
-        Copy prototype
-      </button>
-    );
-  }
-
-  return (
-    <span className="flex items-center gap-1.5 text-[11px] text-ink-4">
-      <Sparkles className="size-3.5 text-spark" />
-      Updates as you work
-    </span>
-  );
-}
-
 function ArtifactSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-[900px] px-8 py-12 xl:px-12">
-      <div className="max-w-[700px]">
+    <div className="mx-auto w-full max-w-[940px] px-7 py-12 xl:px-12">
+      <div className="max-w-[720px]">
         <div className="forge-shimmer h-3 w-28 rounded-full bg-inset" />
         <div className="forge-shimmer mt-4 h-9 w-3/5 rounded-xl bg-inset [animation-delay:100ms]" />
         <div className="forge-shimmer mt-4 h-4 w-full rounded-lg bg-inset [animation-delay:160ms]" />
         <div className="forge-shimmer mt-2 h-4 w-4/5 rounded-lg bg-inset [animation-delay:220ms]" />
       </div>
-      <div className="mt-10 max-w-[800px] divide-y divide-line border-y border-line">
+      <div className="mt-10 max-w-[820px] divide-y divide-line border-y border-line">
         {[0, 1, 2].map((item) => (
           <div key={item} className="grid grid-cols-[180px_1fr] gap-8 py-5">
             <div className="forge-shimmer h-3 w-24 rounded bg-inset" />
             <div className="forge-shimmer h-4 w-4/5 rounded bg-inset" />
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function MobileArtifact({
-  conv,
-  tab,
-  setTab,
-}: {
-  conv: Conversation;
-  tab: ArtifactTab;
-  setTab: (tab: ArtifactTab) => void;
-}) {
-  const tabs: Array<{ id: ArtifactTab; label: string; available: boolean }> = [
-    { id: "model", label: "Idea", available: true },
-    { id: "research", label: "Research", available: Boolean(conv.research) },
-    { id: "directions", label: "Directions", available: conv.theses.length > 0 },
-    { id: "brief", label: "Brief", available: Boolean(conv.spec) },
-    { id: "prototype", label: "Prototype", available: Boolean(conv.prototype) },
-  ];
-
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-raised px-3 py-2">
-        {tabs.filter((item) => item.available).map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setTab(item.id)}
-            className={"rounded-lg px-3 py-1.5 text-[12px] font-medium " + (tab === item.id ? "bg-inset text-ink" : "text-ink-4")}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === "model" && <ModelArtifact conv={conv} />}
-        {tab === "research" && <ResearchArtifact conv={conv} />}
-        {tab === "directions" && <DirectionsArtifact conv={conv} />}
-        {tab === "brief" && <BriefArtifact conv={conv} />}
-        {tab === "prototype" && <PrototypeArtifact conv={conv} />}
       </div>
     </div>
   );
