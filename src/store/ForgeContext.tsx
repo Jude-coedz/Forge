@@ -479,11 +479,12 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         "Create a working interactive prototype from the locked Build Brief. Focus on the riskiest core workflow and keep the prototype faithful to V1.",
         "prototype",
       );
-      if (!result.prototype) throw new Error("Prototype was missing.");
+      const prototype = result.prototype;
+      if (!prototype) throw new Error("Prototype was missing.");
 
       setConversations((list) => list.map((item) => item.id === conv.id ? {
         ...item,
-        prototype: result.prototype,
+        prototype,
         stage: "prototype",
         updatedAt: Date.now(),
       } : item));
