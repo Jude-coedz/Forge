@@ -92,6 +92,32 @@ export type ValidationItem = {
   successSignal: string;
 };
 
+export type ResearchSource = {
+  title: string;
+  url: string;
+};
+
+export type ResearchSignal = {
+  title: string;
+  detail: string;
+  stance: "supports" | "challenges" | "context";
+};
+
+export type ResearchAlternative = {
+  name: string;
+  description: string;
+  relevance: string;
+};
+
+export type MarketResearch = {
+  summary: string;
+  signals: ResearchSignal[];
+  alternatives: ResearchAlternative[];
+  unresolved: string[];
+  sources: ResearchSource[];
+  researchedAt: number;
+};
+
 export type PrototypeDoc = {
   html: string;
   summary: string;
@@ -120,6 +146,7 @@ export type Conversation = {
   messages: ChatMessage[];
   sources: string[];
   productModel: ProductModel;
+  research: MarketResearch | null;
   theses: ThesisOption[];
   selectedThesis: ThesisId;
   thesisLocked: boolean;
