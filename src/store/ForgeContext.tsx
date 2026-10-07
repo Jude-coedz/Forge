@@ -13,6 +13,7 @@ import { uid } from "../lib/id";
 import type {
   ChatMessage,
   Conversation,
+  MarketResearch,
   ProductModel,
   ProjectStage,
   PrototypeDoc,
@@ -50,6 +51,7 @@ function blankConversation(): Conversation {
     messages: [],
     sources: [],
     productModel: blankProductModel(),
+    research: null,
     theses: [],
     selectedThesis: "A",
     thesisLocked: false,
@@ -61,6 +63,19 @@ function blankConversation(): Conversation {
 
 function isStage(value: unknown): value is ProjectStage {
   return value === "frame" || value === "challenge" || value === "decide" || value === "brief" || value === "prototype" || value === "handoff";
+}
+
+function normalizeResearch(value: unknown): MarketResearch | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Partial<MarketResearch>;
+  return {
+    summary: typeof raw.summary === "string" ? raw.summary : "",
+    signals: Array.isArray(raw.signals) ? raw.signals : [],
+    alternatives: Array.isArray(raw.alternatives) ? raw.alternatives : [],
+    unresolved: Array.isArray(raw.unresolved) ? raw.unresolved.filter((x): x is string => typeof x === "string") : [],
+    sources: Array.isArray(raw.sources) ? raw.sources.filter((item) => Boolean(item && typeof item.url === "string")) : [],
+    researchedAt: typeof raw.researchedAt === "number" ? raw.researchedAt : Date.now(),
+  };
 }
 
 function normalizeSpec(value: unknown): SpecDoc | null {
@@ -109,6 +124,7 @@ function normalizeConversation(value: unknown): Conversation | null {
     ...(raw.productModel && typeof raw.productModel === "object" ? raw.productModel as ProductModel : {}),
   };
   const theses = Array.isArray(raw.theses) ? raw.theses as Conversation["theses"] : [];
+  const research = normalizeResearch(raw.research);
   const spec = normalizeSpec(raw.spec);
   const prototype = normalizePrototype(raw.prototype);
   const messages = Array.isArray(raw.messages)
@@ -129,6 +145,7 @@ function normalizeConversation(value: unknown): Conversation | null {
     messages,
     sources: Array.isArray(raw.sources) ? raw.sources.filter((x): x is string => typeof x === "string") : [],
     productModel,
+    research,
     theses,
     selectedThesis: raw.selectedThesis === "B" || raw.selectedThesis === "C" || raw.selectedThesis === "CUSTOM" ? raw.selectedThesis : "A",
     thesisLocked: raw.thesisLocked === true,
@@ -139,6 +156,7 @@ function normalizeConversation(value: unknown): Conversation | null {
 
   const hasWork = conversation.messages.length > 0
     || Boolean(conversation.productModel.summary || conversation.productModel.opportunity)
+    || Boolean(conversation.research)
     || Boolean(conversation.spec)
     || Boolean(conversation.prototype)
     || conversation.title !== "New project";
@@ -186,6 +204,7 @@ type ForgeContextValue = {
   renameConversation: (id: string, title: string) => void;
   deleteConversation: (id: string) => void;
   sendChat: (text?: string) => void;
+  researchIdea: () => void;
   advanceToDirections: () => void;
   selectThesis: (id: ThesisId) => void;
   lockThesis: () => void;
@@ -285,6 +304,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     patchActive((conversation) => ({
       ...conversation,
       productModel: nextModel,
+      research: changed ? null : conversation.research,
       theses: changed ? [] : conversation.theses,
       thesisLocked: changed ? false : conversation.thesisLocked,
       spec: changed ? null : conversation.spec,
@@ -295,7 +315,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     toast({
       title: "Idea updated",
       body: changed && (conv.theses.length > 0 || conv.spec || conv.prototype)
-        ? "Downstream directions and build outputs were cleared because the core idea changed."
+        ? "Old research, directions, and build outputs were cleared because the core idea changed."
         : "Forge will use this correction in the next reasoning step.",
       tone: changed && (conv.theses.length > 0 || conv.spec || conv.prototype) ? "warn" : "success",
     });
@@ -374,6 +394,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         productName,
         title: autoTitle ? (productName || working.title) : working.title,
         productModel: nextModel,
+        research: didFrameChange ? null : working.research,
         stage: shouldInvalidate ? "challenge" : working.stage,
         theses: shouldInvalidate || working.stage === "frame" || working.stage === "challenge" ? [] : working.theses,
         thesisLocked: shouldInvalidate || working.stage === "frame" || working.stage === "challenge" ? false : working.thesisLocked,
@@ -389,7 +410,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       if (shouldInvalidate) {
         toast({
           title: "Product frame changed",
-          body: "The old direction, build brief, and prototype were cleared so they do not contradict the new context.",
+          body: "Old research, directions, brief, and prototype were cleared so they do not contradict the new context.",
           tone: "warn",
         });
       }
@@ -400,6 +421,46 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       );
     }
   }, [activeId, appendAssistant, composer, conv, failAction, generating, toast]);
+
+  const researchIdea = useCallback(async () => {
+    if (!conv || generating) return;
+    if (!conv.productModel.opportunity && !conv.productModel.summary) {
+      toast({
+        title: "There is not enough of an idea to research yet",
+        body: "Give Forge a problem, idea, or context first. It will structure that before searching the market.",
+        tone: "warn",
+      });
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const result = await runForgeTurn(
+        conv,
+        "Research the current market around this product hypothesis. Look for existing alternatives, current signals that support or challenge the problem, and evidence that changes what we should build.",
+        "research",
+      );
+      if (!result.research) throw new Error("Research was missing.");
+
+      setConversations((list) => list.map((item) => item.id === conv.id ? {
+        ...item,
+        research: result.research ?? null,
+        updatedAt: Date.now(),
+      } : item));
+      appendAssistant(conv.id, result.reply);
+      setGenerating(false);
+      toast({
+        title: "Market research ready",
+        body: "Forge added current market evidence to the idea without changing your product decision.",
+        tone: "success",
+      });
+    } catch {
+      failAction(
+        "Could not research this idea",
+        "Your product thinking is saved. You can retry the market research without losing anything.",
+      );
+    }
+  }, [appendAssistant, conv, failAction, generating, toast]);
 
   const advanceToDirections = useCallback(async () => {
     if (!conv || generating) return;
@@ -572,6 +633,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     renameConversation,
     deleteConversation,
     sendChat,
+    researchIdea,
     advanceToDirections,
     selectThesis,
     lockThesis,
@@ -598,6 +660,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     renameConversation,
     deleteConversation,
     sendChat,
+    researchIdea,
     advanceToDirections,
     selectThesis,
     lockThesis,
