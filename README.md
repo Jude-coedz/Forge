@@ -127,7 +127,7 @@ Cloudflare Worker
 server-side product reasoning prompt
         │
         ▼
-Groq hosted model
+Google Gemini model
 ```
 
 ### Core modules
@@ -174,7 +174,7 @@ npm run dev
 
 The Vite dev server proxies `/api` to a Worker running at `http://127.0.0.1:8787`.
 
-For full local API testing, run the Cloudflare Worker dev process separately and configure `GROQ_API_KEY` as a Worker secret. Never expose the key through a `VITE_` variable.
+For full local API testing, run the Cloudflare Worker dev process separately and configure `Gemini_key` as a Worker secret. Never expose the key through a `VITE_` variable.
 
 ## Production
 
@@ -183,8 +183,8 @@ Forge is deployed with Cloudflare Workers + Static Assets.
 - Worker name: `forge`
 - Production branch: `main`
 - API route: `/api/forge/turn`
-- Hosted model: configured by `GROQ_MODEL`
-- Secret: `GROQ_API_KEY`
+- Hosted model: configured by `GEMINI_MODEL` (defaults to `gemini-3.8-flash`)
+- Secret: `Gemini_key`
 
 ## Definition of done
 
