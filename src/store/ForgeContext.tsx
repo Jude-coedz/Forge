@@ -15,6 +15,7 @@ import type {
   Conversation,
   ProductModel,
   ProjectStage,
+  PrototypeDoc,
   SpecDoc,
   Theme,
   ThesisId,
@@ -53,12 +54,13 @@ function blankConversation(): Conversation {
     selectedThesis: "A",
     thesisLocked: false,
     spec: null,
+    prototype: null,
     productName: "",
   };
 }
 
 function isStage(value: unknown): value is ProjectStage {
-  return value === "frame" || value === "challenge" || value === "decide" || value === "brief" || value === "handoff";
+  return value === "frame" || value === "challenge" || value === "decide" || value === "brief" || value === "prototype" || value === "handoff";
 }
 
 function normalizeSpec(value: unknown): SpecDoc | null {
@@ -77,9 +79,22 @@ function normalizeSpec(value: unknown): SpecDoc | null {
   };
 }
 
+function normalizePrototype(value: unknown): PrototypeDoc | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Partial<PrototypeDoc>;
+  if (typeof raw.html !== "string" || !raw.html.trim()) return null;
+  return {
+    html: raw.html,
+    summary: typeof raw.summary === "string" ? raw.summary : "Interactive prototype generated from the build brief.",
+    screens: Array.isArray(raw.screens) ? raw.screens.filter((x): x is string => typeof x === "string") : [],
+    builtAt: typeof raw.builtAt === "number" ? raw.builtAt : Date.now(),
+  };
+}
+
 function inferLegacyStage(raw: Record<string, unknown>, spec: SpecDoc | null, thesisCount: number): ProjectStage {
   if (isStage(raw.stage)) return raw.stage;
-  if (raw.prototype || raw.evalReport) return "handoff";
+  if (raw.prototype) return "prototype";
+  if (raw.evalReport) return "handoff";
   if (spec) return "brief";
   if (thesisCount > 0 || raw.phase === "position") return "decide";
   if (raw.phase === "interrogate") return "challenge";
@@ -95,6 +110,7 @@ function normalizeConversation(value: unknown): Conversation | null {
   };
   const theses = Array.isArray(raw.theses) ? raw.theses as Conversation["theses"] : [];
   const spec = normalizeSpec(raw.spec);
+  const prototype = normalizePrototype(raw.prototype);
   const messages = Array.isArray(raw.messages)
     ? raw.messages.filter((m): m is ChatMessage => Boolean(m && typeof m === "object" && (m as ChatMessage).role && typeof (m as ChatMessage).text === "string"))
       .map((m) => ({ id: m.id || uid(), role: m.role, text: m.text, createdAt: m.createdAt || Date.now() }))
@@ -117,12 +133,14 @@ function normalizeConversation(value: unknown): Conversation | null {
     selectedThesis: raw.selectedThesis === "B" || raw.selectedThesis === "C" || raw.selectedThesis === "CUSTOM" ? raw.selectedThesis : "A",
     thesisLocked: raw.thesisLocked === true,
     spec,
+    prototype,
     productName,
   };
 
   const hasWork = conversation.messages.length > 0
     || Boolean(conversation.productModel.summary || conversation.productModel.opportunity)
     || Boolean(conversation.spec)
+    || Boolean(conversation.prototype)
     || conversation.title !== "New project";
 
   return hasWork ? conversation : null;
@@ -170,7 +188,9 @@ type ForgeContextValue = {
   advanceToDirections: () => void;
   selectThesis: (id: ThesisId) => void;
   lockThesis: () => void;
+  buildPrototype: () => void;
   copySpec: () => void;
+  copyPrototype: () => void;
   toast: (toast: Omit<Toast, "id">) => void;
   dismissToast: (id: string) => void;
 };
@@ -316,7 +336,12 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       const didFrameChange = frameChanged(working.productModel, nextModel);
       const productName = result.productName || working.productName;
       const autoTitle = working.title === "New project";
-      const shouldInvalidate = didFrameChange && (working.stage === "decide" || working.stage === "brief" || working.stage === "handoff");
+      const shouldInvalidate = didFrameChange && (
+        working.stage === "decide"
+        || working.stage === "brief"
+        || working.stage === "prototype"
+        || working.stage === "handoff"
+      );
 
       const patched: Conversation = {
         ...working,
@@ -327,6 +352,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         theses: shouldInvalidate || working.stage === "frame" || working.stage === "challenge" ? [] : working.theses,
         thesisLocked: shouldInvalidate || working.stage === "frame" || working.stage === "challenge" ? false : working.thesisLocked,
         spec: shouldInvalidate || working.stage === "frame" || working.stage === "challenge" ? null : working.spec,
+        prototype: shouldInvalidate || working.stage === "frame" || working.stage === "challenge" ? null : working.prototype,
         updatedAt: Date.now(),
       };
 
@@ -337,7 +363,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       if (shouldInvalidate) {
         toast({
           title: "Product frame changed",
-          body: "The old direction and build brief were cleared so they do not contradict the new context.",
+          body: "The old direction, build brief, and prototype were cleared so they do not contradict the new context.",
           tone: "warn",
         });
       }
@@ -375,6 +401,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         selectedThesis: selected,
         thesisLocked: false,
         spec: null,
+        prototype: null,
         stage: "decide",
         updatedAt: Date.now(),
       } : item));
@@ -394,6 +421,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       selectedThesis: id,
       thesisLocked: false,
       spec: null,
+      prototype: null,
       stage: "decide",
     }));
   }, [patchActive]);
@@ -420,6 +448,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         theses: result.theses ?? item.theses,
         thesisLocked: true,
         spec,
+        prototype: null,
         stage: "brief",
         updatedAt: Date.now(),
       } : item));
@@ -438,12 +467,59 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     }
   }, [appendAssistant, conv, failAction, generating, toast]);
 
+  const buildPrototype = useCallback(async () => {
+    if (!conv?.spec || generating) return;
+
+    setGenerating(true);
+    patchActive((conversation) => ({ ...conversation, stage: "prototype" }));
+
+    try {
+      const result = await runForgeTurn(
+        conv,
+        "Create a working interactive prototype from the locked Build Brief. Focus on the riskiest core workflow and keep the prototype faithful to V1.",
+        "prototype",
+      );
+      if (!result.prototype) throw new Error("Prototype was missing.");
+
+      setConversations((list) => list.map((item) => item.id === conv.id ? {
+        ...item,
+        prototype: result.prototype,
+        stage: "prototype",
+        updatedAt: Date.now(),
+      } : item));
+      appendAssistant(conv.id, result.reply);
+      setGenerating(false);
+      toast({
+        title: "Working prototype ready",
+        body: "Forge built an interactive prototype from the locked V1 brief.",
+        tone: "success",
+      });
+    } catch {
+      setGenerating(false);
+      toast({
+        title: "Could not build the prototype",
+        body: "The Build Brief is still saved. Retry prototype generation when ready.",
+        tone: "danger",
+      });
+    }
+  }, [appendAssistant, conv, generating, patchActive, toast]);
+
   const copySpec = useCallback(() => {
     if (!conv?.spec) return;
     void navigator.clipboard.writeText(specToMarkdown(conv.spec));
     toast({
       title: "Build brief copied",
       body: "The Markdown brief is ready to paste into your builder or docs.",
+      tone: "success",
+    });
+  }, [conv, toast]);
+
+  const copyPrototype = useCallback(() => {
+    if (!conv?.prototype) return;
+    void navigator.clipboard.writeText(conv.prototype.html);
+    toast({
+      title: "Prototype HTML copied",
+      body: "The self-contained prototype is ready to paste into a file or coding tool.",
       tone: "success",
     });
   }, [conv, toast]);
@@ -471,7 +547,9 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     advanceToDirections,
     selectThesis,
     lockThesis,
+    buildPrototype,
     copySpec,
+    copyPrototype,
     toast,
     dismissToast,
   }), [
@@ -494,7 +572,9 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     advanceToDirections,
     selectThesis,
     lockThesis,
+    buildPrototype,
     copySpec,
+    copyPrototype,
     toast,
     dismissToast,
   ]);
