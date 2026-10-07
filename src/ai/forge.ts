@@ -105,7 +105,7 @@ function cleanPrototype(value: unknown): PrototypeDoc | undefined {
 }
 
 function cleanReply(value: unknown) {
-  if (typeof value !== "string" || !value.trim()) return "I need a little more context to respond usefully.";
+  if (typeof value !== "string" || !value.trim()) return "I’ve kept the uncertain parts explicit and updated the working product model from what you gave me.";
   return value.trim();
 }
 
