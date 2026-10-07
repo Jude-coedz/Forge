@@ -50,8 +50,8 @@ export function ForgeWorkspace() {
   ];
 
   return (
-    <main className="flex min-h-0 min-w-0 flex-1 bg-surface">
-      <section className="flex min-h-0 w-full min-w-0 flex-col border-r border-line lg:w-[430px] lg:shrink-0">
+    <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface lg:flex-row">
+      <section className="flex min-h-[46%] w-full min-w-0 flex-col border-b border-line lg:min-h-0 lg:w-[430px] lg:shrink-0 lg:border-b-0 lg:border-r">
         <div className="shrink-0 border-b border-line px-4 py-3.5 sm:px-5">
           <p className="text-[13px] font-medium text-ink">Thinking with Forge</p>
           <p className="mt-0.5 text-[12px] text-ink-4">Talk naturally. Forge keeps the product structure out of your way.</p>
