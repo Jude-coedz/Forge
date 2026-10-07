@@ -1,6 +1,7 @@
 import type {
   Conversation,
   ProductModel,
+  PrototypeDoc,
   SpecDoc,
   ThesisOption,
 } from "../types";
@@ -13,6 +14,7 @@ export type ForgeTurnResult = {
   productModel?: ProductModel;
   theses?: ThesisOption[];
   spec?: SpecDoc | null;
+  prototype?: PrototypeDoc | null;
 };
 
 function cleanTheses(value: unknown): ThesisOption[] | undefined {
@@ -90,6 +92,18 @@ function cleanProductModel(value: unknown): ProductModel | undefined {
   };
 }
 
+function cleanPrototype(value: unknown): PrototypeDoc | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.html !== "string" || !raw.html.trim()) return undefined;
+  return {
+    html: raw.html,
+    summary: typeof raw.summary === "string" ? raw.summary : "Interactive prototype generated from the locked build brief.",
+    screens: Array.isArray(raw.screens) ? raw.screens.filter((x): x is string => typeof x === "string").slice(0, 8) : [],
+    builtAt: Date.now(),
+  };
+}
+
 function cleanReply(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return "I need a little more context to respond usefully.";
   return value.trim();
@@ -108,5 +122,6 @@ export async function runForgeTurn(
     productModel: cleanProductModel(raw.productModel),
     theses: cleanTheses(raw.theses),
     spec: raw.spec && typeof raw.spec === "object" ? (raw.spec as SpecDoc) : raw.spec === null ? null : undefined,
+    prototype: cleanPrototype(raw.prototype),
   };
 }
