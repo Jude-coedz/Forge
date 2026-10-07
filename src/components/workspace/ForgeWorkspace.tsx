@@ -7,7 +7,6 @@ import {
   Code2,
   Copy,
   FileText,
-  GitBranch,
   Lightbulb,
   Monitor,
   RefreshCw,
