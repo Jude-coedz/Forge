@@ -1,7 +1,8 @@
 type AssetsBinding = { fetch(request: Request): Promise<Response> };
 
 type Env = {
-  Gemini_key: string;
+  Gemini_key?: string;
+  Gemini_Key?: string;
   GEMINI_MODEL?: string;
   ASSETS: AssetsBinding;
 };
@@ -375,6 +376,7 @@ If multiple plausible problems remain, preserve that ambiguity as an open decisi
 
 async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
   const context = body.conversation ?? {};
+  const geminiKey = env.Gemini_key || env.Gemini_Key || "";
   const userMessage = typeof body.message === "string" ? body.message.trim() : "";
   const model = env.GEMINI_MODEL || "gemini-3.8-flash";
 
@@ -382,7 +384,7 @@ async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-goog-api-key": env.Gemini_key,
+      "x-goog-api-key": geminiKey,
     },
     body: JSON.stringify({
       model,
@@ -436,7 +438,7 @@ async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
 
 async function handleTurn(request: Request, env: Env): Promise<Response> {
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
-  if (!env.Gemini_key) return json({ error: "Forge AI is not configured yet." }, 503);
+  if (!env.Gemini_key && !env.Gemini_Key) return json({ error: "Forge AI is not configured yet." }, 503);
 
   const body = (await request.json().catch(() => null)) as TurnBody | null;
   if (!body || !body.conversation || typeof body.conversation !== "object") {
