@@ -11,9 +11,10 @@ function compactConversation(conversation: Conversation, mode: ForgeTurnMode) {
     thesisLocked: conversation.thesisLocked,
   };
 
-  if (mode === "lock-thesis") {
+  if (mode === "prototype") {
     return {
       ...base,
+      spec: conversation.spec,
       recentMessages: conversation.messages.slice(-4).map(({ role, text }) => ({ role, text })),
     };
   }
