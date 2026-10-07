@@ -1,8 +1,8 @@
 type AssetsBinding = { fetch(request: Request): Promise<Response> };
 
 type Env = {
-  GROQ_API_KEY: string;
-  GROQ_MODEL?: string;
+  Gemini_key: string;
+  GEMINI_MODEL?: string;
   ASSETS: AssetsBinding;
 };
 
@@ -322,34 +322,35 @@ For this turn, update the Product Model from the user's latest input. On the fir
 If multiple plausible problems remain, preserve that ambiguity as an open decision instead of prematurely declaring one 'the core problem'. The reply should briefly say what Forge now thinks and what matters next.`;
 }
 
-async function callGroq(env: Env, mode: TurnMode, body: TurnBody) {
+async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
   const context = body.conversation ?? {};
   const userMessage = typeof body.message === "string" ? body.message.trim() : "";
+  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
 
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${env.GROQ_API_KEY}`,
+      "x-goog-api-key": env.Gemini_key,
     },
     body: JSON.stringify({
-      model: env.GROQ_MODEL || "openai/gpt-oss-120b",
-      temperature: 0.1,
-      reasoning_effort: mode === "chat" ? "medium" : "high",
-      messages: [
-        { role: "system", content: systemPrompt(mode) },
-        {
-          role: "user",
-          content: `CURRENT FORGE CONTEXT:\n${JSON.stringify(context)}\n\nUSER INPUT:\n${userMessage || "Proceed based on the explicit user action."}`,
-        },
-      ],
-      response_format: structuredFormat(mode),
+      model,
+      system_instruction: systemPrompt(mode),
+      input: `CURRENT FORGE CONTEXT:\n${JSON.stringify(context)}\n\nUSER INPUT:\n${userMessage || "Proceed based on the explicit user action."}`,
+      generation_config: {
+        thinking_level: mode === "chat" ? "medium" : "high",
+      },
+      response_format: {
+        type: "text",
+        mime_type: "application/json",
+        schema: structuredFormat(mode).json_schema.schema,
+      },
     }),
   });
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    console.error("Groq turn failed", response.status, response.headers.get("x-request-id"), detail.slice(0, 400));
+    console.error("Gemini turn failed", response.status, response.headers.get("x-request-id"), detail.slice(0, 400));
     return {
       error: response.status === 429
         ? "Forge is busy right now. Your work is saved. Retry in a moment."
@@ -358,15 +359,24 @@ async function callGroq(env: Env, mode: TurnMode, body: TurnBody) {
   }
 
   const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string; refusal?: string | null } }>;
+    status?: string;
+    steps?: Array<{
+      type?: string;
+      content?: Array<{ type?: string; text?: string }>;
+    }>;
   };
-  const message = payload.choices?.[0]?.message;
 
-  if (message?.refusal) return { error: "Forge could not respond to that request." };
-  if (!message?.content) return { error: "Forge received an empty model response." };
+  const outputText = payload.steps
+    ?.filter((step) => step.type === "model_output")
+    .flatMap((step) => step.content ?? [])
+    .filter((item) => item.type === "text" && typeof item.text === "string")
+    .map((item) => item.text)
+    .join("");
+
+  if (!outputText) return { error: "Forge received an empty model response." };
 
   try {
-    return JSON.parse(message.content) as Record<string, unknown>;
+    return JSON.parse(outputText) as Record<string, unknown>;
   } catch {
     return { error: "Forge received an invalid structured response." };
   }
@@ -374,7 +384,7 @@ async function callGroq(env: Env, mode: TurnMode, body: TurnBody) {
 
 async function handleTurn(request: Request, env: Env): Promise<Response> {
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
-  if (!env.GROQ_API_KEY) return json({ error: "Forge AI is not configured yet." }, 503);
+  if (!env.Gemini_key) return json({ error: "Forge AI is not configured yet." }, 503);
 
   const body = (await request.json().catch(() => null)) as TurnBody | null;
   if (!body || !body.conversation || typeof body.conversation !== "object") {
@@ -387,7 +397,7 @@ async function handleTurn(request: Request, env: Env): Promise<Response> {
   if (mode === "chat" && !message) return json({ error: "Message is required." }, 400);
   if (message.length > 30000) return json({ error: "This input is too large for one reasoning step." }, 413);
 
-  const result = await callGroq(env, mode, body);
+  const result = await callGemini(env, mode, body);
   if (typeof result.error === "string") {
     const status = result.error.includes("busy") ? 429 : 502;
     return json({ error: result.error }, status);
