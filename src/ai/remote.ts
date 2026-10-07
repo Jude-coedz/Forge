@@ -33,7 +33,7 @@ function transient(status: number) {
   return status === 429 || status === 502 || status === 503 || status === 504;
 }
 
-const RETRY_DELAYS = [800, 1800, 3600];
+const RETRY_DELAYS = [450, 1200];
 
 export class RemoteReasoningProvider implements ForgeReasoningProvider {
   readonly name = "forge-api";
