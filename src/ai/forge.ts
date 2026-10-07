@@ -1,5 +1,6 @@
 import type {
   Conversation,
+  MarketResearch,
   ProductModel,
   PrototypeDoc,
   SpecDoc,
@@ -12,6 +13,7 @@ export type ForgeTurnResult = {
   reply: string;
   productName?: string;
   productModel?: ProductModel;
+  research?: MarketResearch | null;
   theses?: ThesisOption[];
   spec?: SpecDoc | null;
   prototype?: PrototypeDoc | null;
@@ -92,6 +94,46 @@ function cleanProductModel(value: unknown): ProductModel | undefined {
   };
 }
 
+function cleanResearch(value: unknown): MarketResearch | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  const signals = Array.isArray(raw.signals) ? raw.signals : [];
+  const alternatives = Array.isArray(raw.alternatives) ? raw.alternatives : [];
+  const unresolved = Array.isArray(raw.unresolved) ? raw.unresolved : [];
+  const sources = Array.isArray(raw.sources) ? raw.sources : [];
+
+  return {
+    summary: typeof raw.summary === "string" ? raw.summary : "",
+    signals: signals.filter(Boolean).map((item) => {
+      const node = item as Record<string, unknown>;
+      return {
+        title: typeof node.title === "string" ? node.title : "",
+        detail: typeof node.detail === "string" ? node.detail : "",
+        stance: node.stance === "supports" || node.stance === "challenges" || node.stance === "context"
+          ? node.stance
+          : "context",
+      };
+    }),
+    alternatives: alternatives.filter(Boolean).map((item) => {
+      const node = item as Record<string, unknown>;
+      return {
+        name: typeof node.name === "string" ? node.name : "",
+        description: typeof node.description === "string" ? node.description : "",
+        relevance: typeof node.relevance === "string" ? node.relevance : "",
+      };
+    }),
+    unresolved: unresolved.filter((x): x is string => typeof x === "string"),
+    sources: sources.filter(Boolean).map((item) => {
+      const node = item as Record<string, unknown>;
+      return {
+        title: typeof node.title === "string" ? node.title : "",
+        url: typeof node.url === "string" ? node.url : "",
+      };
+    }).filter((item) => item.url.startsWith("http")),
+    researchedAt: Date.now(),
+  };
+}
+
 function cleanPrototype(value: unknown): PrototypeDoc | undefined {
   if (!value || typeof value !== "object") return undefined;
   const raw = value as Record<string, unknown>;
@@ -120,6 +162,7 @@ export async function runForgeTurn(
     reply: cleanReply(raw.reply),
     productName: typeof raw.productName === "string" ? raw.productName.trim() : undefined,
     productModel: cleanProductModel(raw.productModel),
+    research: cleanResearch(raw.research),
     theses: cleanTheses(raw.theses),
     spec: raw.spec && typeof raw.spec === "object" ? (raw.spec as SpecDoc) : raw.spec === null ? null : undefined,
     prototype: cleanPrototype(raw.prototype),
