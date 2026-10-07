@@ -33,9 +33,11 @@ function getSpeechRecognition() {
 export function Composer({
   autoFocus,
   placeholder = "Describe the idea, problem, or paste context…",
+  compact = false,
 }: {
   autoFocus?: boolean;
   placeholder?: string;
+  compact?: boolean;
 }) {
   const f = useForge();
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -102,7 +104,8 @@ export function Composer({
     <form onSubmit={submit} className="w-full">
       <div
         className={
-          "group rounded-[24px] border bg-raised p-3 shadow-[var(--shadow-soft)] transition-[border-color,box-shadow] duration-200 " +
+          "group border bg-raised transition-[border-color,box-shadow] duration-200 " +
+          (compact ? "rounded-[18px] p-2.5 " : "rounded-[24px] p-3 ") +
           (listening
             ? "border-line-strong shadow-[var(--shadow-listening)]"
             : "border-line focus-within:border-line-strong focus-within:shadow-[var(--shadow-focus)]")
@@ -110,12 +113,15 @@ export function Composer({
       >
         <textarea
           autoFocus={autoFocus}
-          rows={6}
+          rows={compact ? 3 : 6}
           value={f.composer}
           onChange={(event) => f.setComposer(event.target.value)}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
-          className="min-h-[168px] w-full resize-none bg-transparent px-3 py-2 text-[18px] leading-8 text-ink outline-none placeholder:text-ink-4 focus-visible:outline-none"
+          className={
+            "w-full resize-none bg-transparent px-3 py-2 text-ink outline-none placeholder:text-ink-4 focus-visible:outline-none " +
+            (compact ? "min-h-[92px] text-[16px] leading-7" : "min-h-[168px] text-[18px] leading-8")
+          }
         />
 
         <div className="flex items-center justify-between px-1 pt-1.5">
@@ -151,7 +157,10 @@ export function Composer({
           <button
             type="submit"
             disabled={!f.composer.trim() || f.generating}
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-ink text-canvas transition-transform duration-150 enabled:hover:scale-[1.04] enabled:active:scale-[0.97] disabled:opacity-25"
+            className={
+              "grid shrink-0 place-items-center rounded-full bg-ink text-canvas transition-transform duration-150 enabled:hover:scale-[1.04] enabled:active:scale-[0.97] disabled:opacity-25 " +
+              (compact ? "size-9" : "size-10")
+            }
             aria-label="Send to Forge"
           >
             <ArrowUp className="size-4.5" />
