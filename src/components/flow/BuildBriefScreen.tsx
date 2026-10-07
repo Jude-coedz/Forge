@@ -212,9 +212,13 @@ export function BuildBriefScreen({ onOpenCopilot }: { onOpenCopilot: () => void 
             <ArrowLeft className="size-3.5" />
             Back
           </Button>
-          <Button variant="temper" onClick={() => f.setProjectStage("handoff")}>
-            Prepare handoff
-            <ArrowRight className="size-3.5" />
+          <Button
+            variant="primary"
+            disabled={f.generating}
+            onClick={() => conv.prototype ? f.setProjectStage("prototype") : f.buildPrototype()}
+          >
+            {f.generating ? "Building prototype…" : conv.prototype ? "Open prototype" : "Build working prototype"}
+            {!f.generating && <ArrowRight className="size-3.5" />}
           </Button>
         </div>
       </div>
