@@ -6,11 +6,13 @@ import {
   ClipboardCopy,
   Code2,
   Copy,
+  ExternalLink,
   FileText,
   Lightbulb,
   Monitor,
   Pencil,
   RefreshCw,
+  Search,
   Send,
   Smartphone,
   Sparkles,
@@ -21,7 +23,7 @@ import { useForge } from "../../store/ForgeContext";
 import type { Conversation, ProductModel, ThesisOption } from "../../types";
 import { Button, Pill, SeverityBadge } from "../ui/primitives";
 
-type ArtifactTab = "model" | "directions" | "brief" | "prototype";
+type ArtifactTab = "model" | "research" | "directions" | "brief" | "prototype";
 
 export function ForgeWorkspace() {
   const f = useForge();
@@ -34,6 +36,7 @@ export function ForgeWorkspace() {
     if (conv.prototype) setTab("prototype");
     else if (conv.spec) setTab("brief");
     else if (conv.theses.length > 0) setTab("directions");
+    else if (conv.research) setTab("research");
     else setTab("model");
   }, [conv?.id, conv?.prototype?.builtAt, conv?.spec, conv?.theses.length]);
 
@@ -46,6 +49,7 @@ export function ForgeWorkspace() {
   const openDecision = conv.productModel.decisions.find((item) => item.status === "open");
   const tabs: Array<{ id: ArtifactTab; label: string; available: boolean }> = [
     { id: "model", label: "Idea", available: true },
+    { id: "research", label: "Research", available: Boolean(conv.research) },
     { id: "directions", label: "Directions", available: conv.theses.length > 0 },
     { id: "brief", label: "Brief", available: Boolean(conv.spec) },
     { id: "prototype", label: "Prototype", available: Boolean(conv.prototype) },
@@ -123,6 +127,7 @@ export function ForgeWorkspace() {
 
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
           {tab === "model" && <ModelArtifact conv={conv} />}
+          {tab === "research" && <ResearchArtifact conv={conv} />}
           {tab === "directions" && <DirectionsArtifact conv={conv} />}
           {tab === "brief" && <BriefArtifact conv={conv} />}
           {tab === "prototype" && <PrototypeArtifact conv={conv} />}
@@ -374,10 +379,16 @@ function ModelArtifact({ conv }: { conv: Conversation }) {
                 Compare genuinely different ways this product could solve the problem before deciding what to prototype.
               </p>
             </div>
-            <Button variant="primary" disabled={f.generating || !hasModel} onClick={f.advanceToDirections}>
-              Explore directions
-              <ArrowRight className="size-3.5" />
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="secondary" disabled={f.generating || !hasModel} onClick={f.researchIdea}>
+                <Search className="size-3.5" />
+                {conv.research ? "Refresh research" : "Research the market"}
+              </Button>
+              <Button variant="primary" disabled={f.generating || !hasModel} onClick={f.advanceToDirections}>
+                Explore directions
+                <ArrowRight className="size-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -415,6 +426,116 @@ function ModelRow({ label, value }: { label: string; value: string }) {
     <div className="grid gap-2 py-5 sm:grid-cols-[180px_1fr] sm:gap-8">
       <span className="text-[13px] text-ink-4">{label}</span>
       <span className="text-[15px] leading-6 text-ink-2">{value}</span>
+    </div>
+  );
+}
+
+function ResearchArtifact({ conv }: { conv: Conversation }) {
+  const f = useForge();
+  const research = conv.research;
+
+  if (!research) return <ArtifactSkeleton />;
+
+  return (
+    <div className="mx-auto w-full max-w-[940px] px-7 py-9 xl:px-12 xl:py-11">
+      <div className="flex flex-wrap items-start justify-between gap-5">
+        <div className="max-w-[720px]">
+          <p className="text-[12px] font-medium text-ink-4">Current market evidence</p>
+          <h1 className="mt-2 text-[31px] font-medium leading-[1.16] tracking-[-0.035em] text-ink">
+            What changed after looking outside the idea
+          </h1>
+          <p className="mt-4 text-[16px] leading-7 text-ink-2">{research.summary}</p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={f.researchIdea} disabled={f.generating}>
+          <RefreshCw className={"size-3.5 " + (f.generating ? "animate-spin" : "")} />
+          Refresh
+        </Button>
+      </div>
+
+      <div className="mt-9 grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,.85fr)]">
+        <section>
+          <p className="text-[12px] font-medium text-ink-4">Signals</p>
+          <div className="mt-3 divide-y divide-line border-y border-line">
+            {research.signals.map((signal, index) => (
+              <div key={signal.title + index} className="grid gap-2 py-5 sm:grid-cols-[110px_1fr] sm:gap-5">
+                <span className={
+                  "mt-0.5 w-fit rounded-full px-2 py-0.5 text-[10px] font-medium " +
+                  (signal.stance === "supports"
+                    ? "bg-temper-soft text-temper"
+                    : signal.stance === "challenges"
+                      ? "bg-scorch-soft text-scorch"
+                      : "bg-inset text-ink-4")
+                }>
+                  {signal.stance === "supports" ? "Supports" : signal.stance === "challenges" ? "Challenges" : "Context"}
+                </span>
+                <div>
+                  <p className="text-[14px] font-medium text-ink">{signal.title}</p>
+                  <p className="mt-1 text-[13px] leading-6 text-ink-3">{signal.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <p className="text-[12px] font-medium text-ink-4">Existing alternatives</p>
+          <div className="mt-3 space-y-3">
+            {research.alternatives.length > 0 ? research.alternatives.map((item) => (
+              <div key={item.name} className="rounded-[14px] border border-line bg-raised/60 p-4">
+                <p className="text-[13px] font-medium text-ink">{item.name}</p>
+                <p className="mt-1 text-[12px] leading-5 text-ink-3">{item.description}</p>
+                <p className="mt-2 text-[11px] leading-5 text-ink-4">{item.relevance}</p>
+              </div>
+            )) : (
+              <p className="text-[13px] leading-6 text-ink-4">No directly relevant alternative was strong enough to include.</p>
+            )}
+          </div>
+        </section>
+      </div>
+
+      {research.unresolved.length > 0 && (
+        <section className="mt-9 rounded-[16px] border border-molten/20 bg-molten-soft/35 p-5">
+          <p className="text-[12px] font-medium text-molten">Search still cannot prove</p>
+          <ul className="mt-3 space-y-2">
+            {research.unresolved.map((item) => (
+              <li key={item} className="flex gap-3 text-[13px] leading-6 text-ink-2">
+                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-molten" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {research.sources.length > 0 && (
+        <section className="mt-9 border-t border-line pt-6">
+          <p className="text-[12px] font-medium text-ink-4">Sources</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {research.sources.map((source, index) => (
+              <a
+                key={source.url + index}
+                href={source.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 py-1.5 text-[11px] text-ink-3 transition hover:border-line-strong hover:text-ink"
+              >
+                <span className="max-w-[240px] truncate">{source.title || new URL(source.url).hostname}</span>
+                <ExternalLink className="size-3 shrink-0" />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
+        <p className="max-w-xl text-[12px] leading-5 text-ink-4">
+          External evidence changes the hypothesis; it does not automatically prove demand or willingness to switch.
+        </p>
+        <Button variant="primary" disabled={f.generating} onClick={f.advanceToDirections}>
+          Explore directions
+          <ArrowRight className="size-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -754,6 +875,7 @@ function MobileArtifact({
 }) {
   const tabs: Array<{ id: ArtifactTab; label: string; available: boolean }> = [
     { id: "model", label: "Idea", available: true },
+    { id: "research", label: "Research", available: Boolean(conv.research) },
     { id: "directions", label: "Directions", available: conv.theses.length > 0 },
     { id: "brief", label: "Brief", available: Boolean(conv.spec) },
     { id: "prototype", label: "Prototype", available: Boolean(conv.prototype) },
@@ -775,6 +897,7 @@ function MobileArtifact({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === "model" && <ModelArtifact conv={conv} />}
+        {tab === "research" && <ResearchArtifact conv={conv} />}
         {tab === "directions" && <DirectionsArtifact conv={conv} />}
         {tab === "brief" && <BriefArtifact conv={conv} />}
         {tab === "prototype" && <PrototypeArtifact conv={conv} />}
