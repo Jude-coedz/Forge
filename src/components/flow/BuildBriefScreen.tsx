@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { ArrowLeft, ArrowRight, Check, ClipboardCopy, FlaskConical, ShieldAlert } from "lucide-react";
 import { useForge } from "../../store/ForgeContext";
@@ -297,10 +298,10 @@ function DetailPanel({
   tone,
   children,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
   tone: "scorch" | "molten";
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <section className="rounded-[20px] border border-line-strong bg-raised p-4">
