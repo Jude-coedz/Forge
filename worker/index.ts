@@ -6,7 +6,7 @@ type Env = {
   ASSETS: AssetsBinding;
 };
 
-type TurnMode = "chat" | "directions" | "lock-thesis";
+type TurnMode = "chat" | "directions" | "lock-thesis" | "prototype";
 
 type TurnBody = {
   mode?: TurnMode;
@@ -166,6 +166,17 @@ const metricSchema = {
   required: ["name", "target"],
 };
 
+const prototypeSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    html: { type: "string" },
+    summary: { type: "string" },
+    screens: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 8 },
+  },
+  required: ["html", "summary", "screens"],
+};
+
 const specSchema = {
   type: "object",
   additionalProperties: false,
@@ -237,6 +248,25 @@ function structuredFormat(mode: TurnMode) {
     };
   }
 
+  if (mode === "prototype") {
+    return {
+      type: "json_schema",
+      json_schema: {
+        name: "forge_working_prototype",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            reply: { type: "string" },
+            prototype: prototypeSchema,
+          },
+          required: ["reply", "prototype"],
+        },
+      },
+    };
+  }
+
   return {
     type: "json_schema",
     json_schema: {
@@ -261,7 +291,7 @@ function systemPrompt(mode: TurnMode) {
 
 Forge has one job: help someone turn a messy idea into a defensible product direction and a build-ready brief before they start building.
 
-The visible workflow is Frame -> Challenge -> Decide -> Build Brief -> Handoff. The Product Model is internal memory. Do not make the user manage the model or learn a product-management framework.
+The visible workflow is Frame -> Challenge -> Decide -> Build Brief -> Prototype -> Handoff. The Product Model is internal memory. Do not make the user manage the model or learn a product-management framework.
 
 PRODUCT THINKING
 - Start from the customer problem or opportunity, not the proposed solution.
@@ -315,6 +345,27 @@ The Build Brief must:
 The result should be useful to hand directly to a coding or prototyping tool.`;
   }
 
+  if (mode === "prototype") {
+    return `${core}
+
+The user has locked the Build Brief and explicitly asked Forge to create a working prototype.
+
+Generate one self-contained HTML document that demonstrates the riskiest and most important V1 workflow from the locked brief.
+
+PROTOTYPE RULES
+- The prototype must be interactive, not a static mockup. Navigation, buttons, form inputs, toggles, tabs, dialogs, confirmations, empty states, and state changes should work with inline JavaScript where relevant.
+- Use only inline HTML, CSS, SVG, and JavaScript. Do not use external libraries, remote fonts, remote images, fetch calls, APIs, iframes, analytics, or network requests.
+- Keep all data local and ephemeral. The prototype must not submit forms or contact external services.
+- Build 2-6 coherent views or states that prove the product's core mechanism. Do not create a generic SaaS dashboard unless the chosen product direction genuinely requires one.
+- Reflect the primary user, chosen direction, P0 requirements, explicit non-goals, and important failure modes from the Build Brief.
+- Use realistic interface copy derived from the brief. Do not invent customer evidence, integrations, payments, or operational capabilities that the brief does not support.
+- Make the prototype visually polished enough to evaluate the workflow: strong hierarchy, deliberate spacing, responsive layout, clear active/disabled/success/error states, and restrained motion.
+- Prefer one memorable interaction that communicates the product mechanism over decorative effects.
+- The HTML string must start with <!doctype html> and contain no Markdown fences.
+- The summary should explain what workflow the prototype tests and what is intentionally not simulated.
+- screens should list the main views/states included in the prototype.`;
+  }
+
   return `${core}
 
 For this turn, update the Product Model from the user's latest input. On the first idea, do useful synthesis before asking anything: infer a working user, opportunity, current workaround, and desired outcome where the input supports them, and label uncertainty as assumptions.
@@ -339,6 +390,7 @@ async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
       input: `CURRENT FORGE CONTEXT:\n${JSON.stringify(context)}\n\nUSER INPUT:\n${userMessage || "Proceed based on the explicit user action."}`,
       generation_config: {
         thinking_level: mode === "chat" ? "medium" : "high",
+        max_output_tokens: mode === "prototype" ? 24000 : 12000,
       },
       response_format: {
         type: "text",
@@ -391,7 +443,10 @@ async function handleTurn(request: Request, env: Env): Promise<Response> {
     return json({ error: "Project context is required." }, 400);
   }
 
-  const mode: TurnMode = body.mode === "directions" || body.mode === "lock-thesis" ? body.mode : "chat";
+  const mode: TurnMode =
+    body.mode === "directions" || body.mode === "lock-thesis" || body.mode === "prototype"
+      ? body.mode
+      : "chat";
   const message = typeof body.message === "string" ? body.message.trim() : "";
 
   if (mode === "chat" && !message) return json({ error: "Message is required." }, 400);
