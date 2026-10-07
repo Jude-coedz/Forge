@@ -210,7 +210,7 @@ const researchSchema = {
     },
     sources: {
       type: "array",
-      minItems: 1,
+      minItems: 0,
       maxItems: 10,
       items: {
         type: "object",
@@ -223,7 +223,7 @@ const researchSchema = {
       },
     },
   },
-  required: ["summary", "signals", "alternatives", "unresolved", "sources"],
+  required: ["summary", "signals", "alternatives", "unresolved"],
 };
 
 const prototypeSchema = {
@@ -419,7 +419,7 @@ OUTPUT
 - signals: 2-6 concrete findings, each marked supports, challenges, or context.
 - alternatives: up to 6 directly relevant products or substitutes, with why each matters to this idea.
 - unresolved: the most important things web research still cannot prove.
-- sources: the useful URLs actually used.
+- sources: useful URLs actually used when they are available. Do not fail the research output if source metadata is incomplete.
 - reply: a concise 1-3 sentence conversational takeaway. Do not repeat the whole report.`;
   }
 
