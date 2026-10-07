@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ArrowRight, FileText, GitBranch, Lightbulb, Search, Sparkles } from "lucide-react";
 import { useForge } from "../../store/ForgeContext";
 import { ForgeMark } from "../ui/primitives";
@@ -136,7 +137,7 @@ function TransformStep({
   title: string;
   body: string;
   tone?: "quiet" | "default" | "accent";
-  icon?: React.ReactNode;
+  icon?: ReactNode;
 }) {
   return (
     <div
