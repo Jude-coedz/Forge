@@ -15,6 +15,7 @@ const missingAssets = {
 export default function handler(request: Request) {
   return worker.fetch(request, {
     Gemini_key: process.env.Gemini_key ?? "",
+    Gemini_Key: process.env.Gemini_Key ?? "",
     GEMINI_MODEL: process.env.GEMINI_MODEL,
     ASSETS: missingAssets,
   });
