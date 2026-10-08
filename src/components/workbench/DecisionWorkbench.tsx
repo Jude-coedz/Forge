@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  ArrowLeft, ArrowRight, Check, ChevronDown,
+  ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight,
   ClipboardCopy, Code2, ExternalLink, Monitor, Pencil,
   RefreshCw, Search, Smartphone, X,
 } from "lucide-react";
