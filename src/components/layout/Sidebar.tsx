@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Check, ChevronLeft, ChevronRight, FileText, MoreHorizontal,
+  Check, FileText, MoreHorizontal,
   PanelLeftClose, PanelLeftOpen, Pencil, Plus, Trash2, X,
 } from "lucide-react";
 import { useForge } from "../../store/ForgeContext";
