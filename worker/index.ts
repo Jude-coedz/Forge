@@ -639,26 +639,39 @@ async function generateOnce(
         }],
         ...(mode === "research" ? { tools: [{ googleSearch: {} }, { urlContext: {} }] } : {}),
         generationConfig: {
-          thinkingConfig: { thinkingLevel: mode === "chat" ? "low" : fallback ? "low" : mode === "prototype" ? "medium" : "medium" },
+          ...(mode === "chat" ? {} : {
+            thinkingConfig: { thinkingLevel: fallback ? "minimal" : "medium" },
+          }),
           maxOutputTokens: mode === "chat" ? 1400 : mode === "prototype" ? 20000 : 6500,
-          responseFormat: {
-            text: {
-              mimeType: "application/json",
-              schema: structuredFormat(mode).json_schema.schema,
-            },
-          },
+          responseMimeType: "application/json",
+          responseJsonSchema: structuredFormat(mode).json_schema.schema,
         },
       }),
     });
 
     if (!response.ok) {
       // Never return a raw Google error, request header, key or project identifier to the browser.
+      const detail = await response.text().catch(() => "");
+      // Classify failures without leaking Google account, project or API-key details
+      // to a public client or logging the full upstream response.
+      const reason = /thinking.level|thinking level|thinkingConfig/i.test(detail) ? "THINKING_CONFIG"
+        : /responseFormat|responseMimeType|responseJsonSchema|responseSchema/i.test(detail) ? "RESPONSE_FORMAT"
+        : /schema|additionalProperties|required/i.test(detail) ? "SCHEMA"
+        : /model|not found|not supported/i.test(detail) ? "MODEL"
+        : /quota|billing|resource exhausted/i.test(detail) ? "QUOTA_OR_BILLING"
+        : /permission|API key|authentication/i.test(detail) ? "AUTH"
+        : /unknown name|invalid JSON payload/i.test(detail) ? "UNKNOWN_FIELD"
+        : "OTHER";
       const retriable = [408, 429, 500, 502, 503, 504].includes(response.status);
       console.warn("forge.gemini.failure", JSON.stringify({
-        mode, model, status: response.status, elapsedMs: Date.now() - began,
-        retryable: retriable,
+        mode, model, status: response.status, reason,
+        elapsedMs: Date.now() - began, retryable: retriable,
       }));
-      return { ok: false, code: "UPSTREAM_" + response.status, status: response.status, retryable: retriable };
+      return {
+        ok: false,
+        code: "UPSTREAM_" + response.status + "_" + reason,
+        status: response.status, retryable: retriable,
+      };
     }
 
     const payload = await response.json() as {
@@ -746,7 +759,7 @@ async function handleTurn(request: Request, env: Env): Promise<Response> {
 
   const result = await callGemini(env, mode, body);
   if (typeof result.error === "string") {
-    const status = result.code === "UPSTREAM_429" ? 429 : 502;
+    const status = typeof result.code === "string" && result.code.startsWith("UPSTREAM_429") ? 429 : 502;
     return json({ error: result.error, code: result.code ?? "REASONING_FAILED" }, status);
   }
 
