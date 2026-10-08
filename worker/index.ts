@@ -509,7 +509,8 @@ Generate exactly three materially different product directions. They must differ
   if (mode === "lock-thesis") {
     return `${core}
 
-The user has chosen a product direction. Mark the direction decision as decided and generate a concise Build Brief, not a giant PRD.
+The user wants a product prototype. They may have selected one of three alternative mechanisms OR may be prototyping the original idea directly from an adversarial stress test. Do not require a directions comparison when none exists. Generate a concise Build Brief, not a giant PRD.
+If the request is to prototype the current idea, preserve that idea's actual mechanism and make the smallest possible workflow that can test the highest-risk assumption.
 
 The Build Brief must:
 - make the chosen direction unmistakable;
