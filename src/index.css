@@ -3,9 +3,9 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, ui-sans-serif, system-ui, sans-serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  --font-display: "Inter", "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter", "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
@@ -27,71 +27,31 @@
   --color-scorch-soft: var(--scorch-soft);
 }
 
-:root {
-  color-scheme: light;
-
-  /* Warm-paper system: Claude-inspired, not a direct copy. */
-  --canvas: #f5f4f0;
-  --surface: #f8f8f6;
-  --raised: #ffffff;
-  --inset: #efeeeb;
-
-  --line: rgba(18, 18, 18, 0.075);
-  --line-strong: rgba(18, 18, 18, 0.145);
-
-  --ink: #161614;
-  --ink-2: #373734;
-  --ink-3: #6f6c66;
-  --ink-4: #98958e;
-
-  --spark: #d97757;
-  --spark-soft: rgba(217, 119, 87, 0.105);
-
-  --temper: #2f806c;
-  --temper-soft: rgba(47, 128, 108, 0.10);
-  --molten: #a77822;
-  --molten-soft: rgba(167, 120, 34, 0.10);
-  --scorch: #b95850;
-  --scorch-soft: rgba(185, 88, 80, 0.10);
-
-  --shadow-soft: 0 1px 2px rgba(18, 18, 18, 0.035), 0 18px 42px -36px rgba(18, 18, 18, 0.24);
-  --shadow-focus: 0 0 0 1px rgba(18, 18, 18, 0.035), 0 20px 52px -40px rgba(18, 18, 18, 0.26);
-  --shadow-listening: 0 0 0 1px rgba(217, 119, 87, 0.10), 0 18px 48px -38px rgba(217, 119, 87, 0.22);
-  --shadow-float: 0 28px 72px -48px rgba(18, 18, 18, 0.34);
-  --shadow-toast: 0 18px 48px -30px rgba(18, 18, 18, 0.36);
-}
-
-.dark {
+:root, .dark {
   color-scheme: dark;
-
-  --canvas: #161614;
-  --surface: #1b1b19;
-  --raised: #21211e;
-  --inset: #292925;
-
-  --line: rgba(248, 247, 243, 0.075);
-  --line-strong: rgba(248, 247, 243, 0.145);
-
-  --ink: #f2f0e9;
-  --ink-2: #d8d5cc;
-  --ink-3: #a7a39b;
-  --ink-4: #77736c;
-
-  --spark: #e58a69;
-  --spark-soft: rgba(229, 138, 105, 0.12);
-
-  --temper: #62b7a0;
-  --temper-soft: rgba(98, 183, 160, 0.12);
-  --molten: #d1a055;
-  --molten-soft: rgba(209, 160, 85, 0.12);
-  --scorch: #df8179;
-  --scorch-soft: rgba(223, 129, 121, 0.12);
-
-  --shadow-soft: 0 1px 1px rgba(255, 255, 255, 0.018) inset, 0 18px 44px -34px rgba(0, 0, 0, 0.72);
-  --shadow-focus: 0 0 0 1px rgba(255, 255, 255, 0.025), 0 22px 52px -38px rgba(0, 0, 0, 0.78);
-  --shadow-listening: 0 0 0 1px rgba(229, 138, 105, 0.10), 0 20px 50px -38px rgba(229, 138, 105, 0.18);
-  --shadow-float: 0 30px 76px -42px rgba(0, 0, 0, 0.78);
-  --shadow-toast: 0 20px 56px -28px rgba(0, 0, 0, 0.72);
+  --canvas: #0a0a0a;
+  --surface: #0a0a0a;
+  --raised: #191919;
+  --inset: #1a1c20;
+  --line: #212327;
+  --line-strong: #363a3f;
+  --ink: #ffffff;
+  --ink-2: #dadbdf;
+  --ink-3: #a2a5aa;
+  --ink-4: #7d8187;
+  --spark: #ff7a17;
+  --spark-soft: rgba(255, 122, 23, .10);
+  --temper: #a0c3ec;
+  --temper-soft: rgba(160,195,236,.10);
+  --molten: #ffc285;
+  --molten-soft: rgba(255,194,133,.10);
+  --scorch: #ff9386;
+  --scorch-soft: rgba(255,147,134,.10);
+  --shadow-soft: none;
+  --shadow-focus: 0 0 0 1px #363a3f;
+  --shadow-listening: 0 0 0 1px rgba(255,122,23,.38);
+  --shadow-float: none;
+  --shadow-toast: 0 20px 48px rgba(0,0,0,.3);
 }
 
 * {
@@ -116,7 +76,7 @@ body {
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.55;
-  letter-spacing: -0.008em;
+  letter-spacing: -0.012em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -142,7 +102,7 @@ button:not(:disabled) {
 }
 
 :focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--ink) 28%, transparent);
+  outline: 2px solid #a0c3ec;
   outline-offset: 2px;
 }
 
@@ -287,3 +247,10 @@ input::placeholder {
     scroll-behavior: auto !important;
   }
 }
+
+/* Forge / engineered-cosmic identity */
+.forge-display {font-family:var(--font-display);font-weight:400;letter-spacing:-.034em;}
+.forge-eyebrow {font-family:var(--font-mono);font-size:12px;line-height:1.5;font-weight:400;letter-spacing:.12em;text-transform:uppercase;}
+.forge-pill {border-radius:9999px;}
+.forge-surface {background:#191919;border:1px solid #212327;border-radius:8px;box-shadow:none;}
+.forge-content-enter, .forge-message-enter {animation-duration:240ms;}
