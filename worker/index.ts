@@ -303,7 +303,38 @@ const specSchema = {
   ],
 };
 
+const quickFrameSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    reply: { type: "string" },
+    productName: { type: "string" },
+    productModel: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        summary: { type: "string" },
+        primaryUser: { type: "string" },
+        opportunity: { type: "string" },
+        currentWorkaround: { type: "string" },
+        desiredOutcome: { type: "string" },
+      },
+      required: ["summary", "primaryUser", "opportunity", "currentWorkaround", "desiredOutcome"],
+    },
+  },
+  required: ["reply", "productName", "productModel"],
+};
+
 function structuredFormat(mode: TurnMode) {
+  if (mode === "chat") return {
+    type: "json_schema",
+    json_schema: {
+      name: "forge_fast_idea_hypothesis",
+      strict: true,
+      schema: quickFrameSchema,
+    },
+  };
+
   if (mode === "stress-test") {
     return {
       type: "json_schema",
@@ -564,79 +595,138 @@ If multiple plausible problems remain, preserve that ambiguity as one open decis
 The reply must be concise: 1-3 sentences. State Forge's current interpretation and the most important implication. Do not repeat the whole Product Model and do not end with a generic question.`;
 }
 
-async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
+type GeminiAttemptResult =
+  | { ok: true; value: Record<string, unknown> }
+  | { ok: false; status: number; code: string; retryable: boolean };
+
+function geminiTimeout(mode: TurnMode, fallback: boolean) {
+  if (mode === "chat") return fallback ? 16000 : 12000;
+  if (mode === "prototype") return fallback ? 36000 : 65000;
+  return fallback ? 25000 : 35000;
+}
+
+async function generateOnce(
+  env: Env,
+  mode: TurnMode,
+  body: TurnBody,
+  model: string,
+  fallback: boolean,
+): Promise<GeminiAttemptResult> {
+  const key = env.Gemini_key || env.Gemini_Key || "";
+  const message = typeof body.message === "string" ? body.message.trim() : "";
   const context = body.conversation ?? {};
-  const geminiKey = env.Gemini_key || env.Gemini_Key || "";
-  const userMessage = typeof body.message === "string" ? body.message.trim() : "";
-  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
-
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": geminiKey,
-    },
-    body: JSON.stringify({
-      model,
-      store: false,
-      system_instruction: systemPrompt(mode),
-      input: `CURRENT FORGE CONTEXT:\n${JSON.stringify(context)}\n\nUSER INPUT:\n${userMessage || "Proceed based on the explicit user action."}`,
-      generation_config: {
-        thinking_level: mode === "chat" ? "low" : mode === "prototype" ? "high" : mode === "research" ? "medium" : "medium",
-        max_output_tokens: mode === "prototype" ? 24000 : mode === "chat" ? 6000 : 10000,
-      },
-      ...(mode === "research" ? { tools: [{ type: "google_search" }, { type: "url_context" }] } : {}),
-      response_format: {
-        type: "text",
-        mime_type: "application/json",
-        schema: structuredFormat(mode).json_schema.schema,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    console.error("Gemini turn failed", response.status, response.headers.get("x-request-id"), detail.slice(0, 400));
-    const safeDetail = detail
-      .replace(/AIza[0-9A-Za-z_-]+/g, "[redacted]")
-      .slice(0, 220);
-
-    return {
-      error: response.status === 429
-        ? "Forge is busy right now. Your work is saved. Retry in a moment."
-        : `Forge could not complete this reasoning step (Gemini ${response.status}). ${safeDetail || "Your work is saved."}`,
-    };
-  }
-
-  const payload = (await response.json()) as {
-    status?: string;
-    steps?: Array<{
-      type?: string;
-      content?: Array<{ type?: string; text?: string }>;
-    }>;
-  };
-
-  if (payload.status === "failed" || payload.status === "cancelled") {
-    return { error: "Gemini could not complete this reasoning step. Your work is saved." };
-  }
-
-  const outputText = payload.steps
-    ?.filter((step) => step.type === "model_output")
-    .flatMap((step) => step.content ?? [])
-    .filter((item) => item.type === "text" && typeof item.text === "string")
-    .map((item) => item.text)
-    .join("");
-
-  if (!outputText) return { error: "Forge received an empty model response." };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), geminiTimeout(mode, fallback));
+  const began = Date.now();
 
   try {
-    return JSON.parse(outputText) as Record<string, unknown>;
-  } catch {
-    return { error: "Forge received an invalid structured response." };
+    // generateContent returns one synchronous structured completion and does not
+    // depend on the Interactions API step/status lifecycle.
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/" +
+      encodeURIComponent(model) + ":generateContent";
+    const response = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt(mode) }] },
+        contents: [{
+          role: "user",
+          parts: [{
+            text: "CURRENT PROJECT CONTEXT:\\n" + JSON.stringify(context) +
+              "\\n\\nUSER INPUT:\\n" + (message || "Proceed with the selected action."),
+          }],
+        }],
+        ...(mode === "research" ? { tools: [{ googleSearch: {} }, { urlContext: {} }] } : {}),
+        generationConfig: {
+          thinkingConfig: { thinkingLevel: mode === "chat" ? "low" : fallback ? "low" : mode === "prototype" ? "medium" : "medium" },
+          maxOutputTokens: mode === "chat" ? 1400 : mode === "prototype" ? 20000 : 6500,
+          responseFormat: {
+            text: {
+              mimeType: "application/json",
+              schema: structuredFormat(mode).json_schema.schema,
+            },
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      // Never return a raw Google error, request header, key or project identifier to the browser.
+      const retriable = [408, 429, 500, 502, 503, 504].includes(response.status);
+      console.warn("forge.gemini.failure", JSON.stringify({
+        mode, model, status: response.status, elapsedMs: Date.now() - began,
+        retryable: retriable,
+      }));
+      return { ok: false, code: "UPSTREAM_" + response.status, status: response.status, retryable: retriable };
+    }
+
+    const payload = await response.json() as {
+      candidates?: Array<{
+        finishReason?: string;
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
+    };
+    const candidate = payload.candidates?.[0];
+    const output = candidate?.content?.parts?.map((part) => part.text || "").join("") || "";
+    if (!output.trim()) {
+      console.warn("forge.gemini.empty", JSON.stringify({ mode, model, finishReason: candidate?.finishReason }));
+      return { ok: false, code: "EMPTY_RESPONSE", status: 502, retryable: true };
+    }
+    const parsed = JSON.parse(output) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ok: false, code: "INVALID_OUTPUT", status: 502, retryable: true };
+    }
+    console.info("forge.gemini.success", JSON.stringify({ mode, model, elapsedMs: Date.now() - began }));
+    return { ok: true, value: parsed };
+  } catch (error) {
+    const timedOut = controller.signal.aborted;
+    console.warn("forge.gemini.network", JSON.stringify({
+      mode, model, timedOut, elapsedMs: Date.now() - began,
+      kind: error instanceof SyntaxError ? "PARSE" : "NETWORK",
+    }));
+    return { ok: false, code: timedOut ? "UPSTREAM_TIMEOUT" : "NETWORK_OR_PARSE", status: 502, retryable: true };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
+async function callGemini(env: Env, mode: TurnMode, body: TurnBody) {
+  const requested = env.GEMINI_MODEL || "gemini-3.8-flash";
+  // The initial screen needs a small hypothesis, not expensive frontier reasoning.
+  const preferred = mode === "chat" ? "gemini-3.5-flash-lite" : requested;
+  const first = await generateOnce(env, mode, body, preferred, false);
+  if (first.ok) return first.value;
+
+  if (!first.retryable) return {
+    error: first.status === 401 || first.status === 403
+      ? "Gemini access is not authorized. Check the server-side API key."
+      : "Gemini rejected this request (" + first.code + ").",
+    code: first.code,
+  };
+
+  // One controlled fallback with a different model. No uncontrolled browser
+  // retry storm for requests that have already consumed their server budget.
+  const fallbackModel = preferred === "gemini-3.5-flash-lite"
+    ? "gemini-3.5-flash"
+    : "gemini-3.5-flash-lite";
+  const second = await generateOnce(env, mode, body, fallbackModel, true);
+  if (second.ok) return second.value;
+  return {
+    error: second.code === "UPSTREAM_TIMEOUT"
+      ? "Gemini took too long to respond. Your work is saved; retry this action."
+      : "Gemini is unavailable for this action. Your work is saved; retry when the service recovers.",
+    code: second.code,
+  };
+}
+
 async function handleTurn(request: Request, env: Env): Promise<Response> {
+  if (request.method === "GET") return json({
+    status: "ok",
+    provider: "gemini",
+    runtime: "node",
+    configured: Boolean(env.Gemini_key || env.Gemini_Key),
+  });
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
   if (!env.Gemini_key && !env.Gemini_Key) return json({ error: "Forge AI is not configured yet." }, 503);
 
@@ -656,8 +746,8 @@ async function handleTurn(request: Request, env: Env): Promise<Response> {
 
   const result = await callGemini(env, mode, body);
   if (typeof result.error === "string") {
-    const status = result.error.includes("busy") ? 429 : 502;
-    return json({ error: result.error }, status);
+    const status = result.code === "UPSTREAM_429" ? 429 : 502;
+    return json({ error: result.error, code: result.code ?? "REASONING_FAILED" }, status);
   }
 
   return json(result);
