@@ -25,6 +25,8 @@ import type {
 } from "../types";
 
 const STORAGE_KEY = "forge-conversations-v3";
+const ACTIVE_KEY = "forge-active-v3";
+const SIDEBAR_KEY = "forge-sidebar-collapsed-v3";
 const LEGACY_STORAGE_KEY = "forge-conversations-v2";
 
 function blankProductModel(): ProductModel {
@@ -248,14 +250,27 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     return next;
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem(SIDEBAR_KEY) === "true");
   const [conversations, setConversations] = useState<Conversation[]>(loadConversations);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(() => localStorage.getItem(ACTIVE_KEY));
   const [composer, setComposer] = useState("");
   const [generating, setGenerating] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const conv = conversations.find((item) => item.id === activeId) ?? null;
+  useEffect(() => {
+    if (activeId && !conversations.some((item) => item.id === activeId)) setActiveId(null);
+  }, [activeId, conversations]);
+
+  useEffect(() => {
+    if (activeId) localStorage.setItem(ACTIVE_KEY, activeId);
+    else localStorage.removeItem(ACTIVE_KEY);
+  }, [activeId]);
+
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_KEY, String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
