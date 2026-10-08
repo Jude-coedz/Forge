@@ -420,7 +420,7 @@ function PrototypeView({ conv, onBack }: { conv: Conversation; onBack: () => voi
   const f = useForge();
   const [viewport, setViewport] = useState<"desktop" | "mobile">("desktop");
   const securedHtml = useMemo(() => conv.prototype ? securePrototypeHtml(conv.prototype.html) : "", [conv.prototype]);
-  if (!conv.prototype) return <PendingScreen title="Making the decision tangible" subtitle="Forge is building a working demonstration of the riskiest V1 interaction, not an entire fake SaaS." busy={f.generating} onRetry={f.buildChosenPrototype} />;
+  if (!conv.prototype) return <PendingScreen title="Making the decision tangible" subtitle="Forge is building a working demonstration of the riskiest V1 interaction, not an entire fake SaaS." busy={f.generating} onRetry={conv.theses.length ? f.buildChosenPrototype : f.prototypeCurrentIdea} />;
   return (
     <div className="forge-panel-enter pt-10">
       <div className="flex flex-wrap items-end justify-between gap-5">
