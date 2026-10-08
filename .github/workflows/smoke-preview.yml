@@ -13,16 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Diagnose preview connectivity
+      - name: Distinguish static, standalone Node, and Forge API
         run: |
           set +e
-          echo "Static page request:"
-          curl --verbose --connect-timeout 6 --max-time 16 -sS -o /tmp/forge-static.txt -w "STATIC HTTP %{http_code} TCP %{time_connect}s TLS %{time_appconnect}s total %{time_total}s\n" "https://forge-pqyxnvyuf-eeakede-9301.vercel.app/"
-          echo "Static body prefix:"
-          head -c 180 /tmp/forge-static.txt || true
-          echo
-          echo "Health function request:"
-          curl --verbose --connect-timeout 6 --max-time 16 -sS -o /tmp/forge-health.txt -w "HEALTH HTTP %{http_code} TCP %{time_connect}s TLS %{time_appconnect}s total %{time_total}s\n" "https://forge-pqyxnvyuf-eeakede-9301.vercel.app/api/forge/turn"
-          echo "Health body prefix:"
-          head -c 320 /tmp/forge-health.txt || true
-          echo
+          BASE="https://forge-cw4jcsdti-eeakede-9301.vercel.app"
+          for ROUTE in / /api/ping /api/forge/turn; do
+            echo "CHECK $ROUTE"
+            curl --connect-timeout 6 --max-time 14 -sS -o /tmp/forge-result -w "HTTP %{http_code} TCP %{time_connect}s total %{time_total}s\n" "$BASE$ROUTE"
+            echo "curl exit $?"
+            head -c 300 /tmp/forge-result || true
+            echo
+          done
