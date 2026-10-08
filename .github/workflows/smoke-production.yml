@@ -1,4 +1,5 @@
 name: Forge production AI smoke
+# Recheck after Gemini request-contract correction (2026-10-08)
 
 on:
   push:
