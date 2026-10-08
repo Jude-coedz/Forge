@@ -29,27 +29,27 @@
 
 :root, .dark {
   color-scheme: dark;
-  --canvas: #0a0a0a;
-  --surface: #0a0a0a;
-  --raised: #191919;
-  --inset: #1a1c20;
-  --line: #212327;
-  --line-strong: #363a3f;
+  --canvas: #101116;
+  --surface: #12141a;
+  --raised: #1b1e26;
+  --inset: #242832;
+  --line: rgba(239, 242, 250, 0.065);
+  --line-strong: rgba(239, 242, 250, 0.13);
   --ink: #ffffff;
-  --ink-2: #dadbdf;
-  --ink-3: #a2a5aa;
-  --ink-4: #7d8187;
-  --spark: #ff7a17;
-  --spark-soft: rgba(255, 122, 23, .10);
+  --ink-2: #e0e1e6;
+  --ink-3: #a9aebc;
+  --ink-4: #858b9b;
+  --spark: #e5a17f;
+  --spark-soft: rgba(229, 161, 127, .13);
   --temper: #a0c3ec;
   --temper-soft: rgba(160,195,236,.10);
   --molten: #ffc285;
   --molten-soft: rgba(255,194,133,.10);
   --scorch: #ff9386;
   --scorch-soft: rgba(255,147,134,.10);
-  --shadow-soft: none;
-  --shadow-focus: 0 0 0 1px #363a3f;
-  --shadow-listening: 0 0 0 1px rgba(255,122,23,.38);
+  --shadow-soft: 0 14px 54px rgba(0,0,0,.18);
+  --shadow-focus: 0 10px 40px rgba(0,0,0,.25);
+  --shadow-listening: 0 0 0 1px rgba(229,161,127,.28), 0 12px 42px rgba(0,0,0,.23);
   --shadow-float: none;
   --shadow-toast: 0 20px 48px rgba(0,0,0,.3);
 }
@@ -101,9 +101,12 @@ button:not(:disabled) {
   color: var(--ink);
 }
 
-:focus-visible {
-  outline: 2px solid #a0c3ec;
-  outline-offset: 2px;
+:is(button, a, summary):focus-visible {
+  outline: 2px solid #c0c4d0;
+  outline-offset: 3px;
+}
+:is(input, textarea):focus-visible {
+  outline: none;
 }
 
 textarea::placeholder,
@@ -274,4 +277,31 @@ input::placeholder {
 }
 @media (prefers-reduced-motion: reduce) {
   .forge-panel-enter, .forge-detail-enter, .forge-process-pulse { animation:none !important; }
+}
+
+/* Shape & motion system: softened workbench, not an endless grid of boxes */
+.forge-composer-shell {
+  border-radius: 28px;
+  background: linear-gradient(160deg, rgba(35,39,48,.98), rgba(27,30,38,.98));
+  border: 1px solid rgba(255,255,255,.075);
+  box-shadow: 0 2px 2px rgba(0,0,0,.06), 0 20px 64px rgba(0,0,0,.17);
+  transition: border-color 200ms ease, box-shadow 250ms ease, transform 250ms ease;
+}
+.forge-composer-shell:focus-within {
+  border-color: rgba(255,255,255,.19);
+  box-shadow: 0 2px 2px rgba(0,0,0,.06), 0 22px 76px rgba(0,0,0,.23);
+}
+.forge-soft-panel {
+  border-radius: 22px;
+  border: 1px solid rgba(255,255,255,.065);
+  background: rgba(27,30,38,.76);
+}
+.forge-stage {
+  isolation: isolate;
+}
+.forge-home-glow {
+  background: radial-gradient(ellipse 46% 40% at 85% 25%, rgba(98,88,130,.10), transparent 82%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .forge-composer-shell { transition: none !important; }
 }
