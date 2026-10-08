@@ -16,7 +16,7 @@ jobs:
       - name: Check Gemini via deployed Forge API
         run: |
           node --input-type=module <<'NODE'
-          const origin = "https://forge-git-fix-gemini-runtime-and-ui-eeakede-9301.vercel.app";
+          const origin = "https://forge-pqyxnvyuf-eeakede-9301.vercel.app";
           const url = origin + "/api/forge/turn";
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 115000);
