@@ -64,9 +64,9 @@ test("initial idea uses short Gemini model and structured response", async () =>
     const data = await response.json();
     assert.equal(data.productModel.primaryUser, "Freelancers");
     assert.match(inspected.url, /gemini-3\.5-flash-lite/);
-    assert.equal(inspected.body.generationConfig.responseFormat.text.mimeType, "application/json");
-    assert.equal(inspected.body.generationConfig.thinkingConfig.thinkingLevel, "low");
-    assert.equal(inspected.body.generationConfig.responseFormat.text.schema.properties.productModel.required.length, 5);
+    assert.equal(inspected.body.generationConfig.responseMimeType, "application/json");
+    assert.equal(inspected.body.generationConfig.thinkingConfig, undefined);
+    assert.equal(inspected.body.generationConfig.responseJsonSchema.properties.productModel.required.length, 5);
   } finally { globalThis.fetch = original; }
 });
 
