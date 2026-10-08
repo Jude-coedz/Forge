@@ -231,6 +231,7 @@ type ForgeContextValue = {
   stressTestIdea: () => void;
   advanceToDirections: () => void;
   buildChosenPrototype: () => void;
+  prototypeCurrentIdea: () => void;
   selectThesis: (id: ThesisId) => void;
   lockThesis: () => void;
   buildPrototype: () => void;
@@ -673,23 +674,15 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     }
   }, [appendAssistant, conv, generating, patchActive, toast]);
 
-  const buildChosenPrototype = useCallback(async () => {
-    if (!conv || generating) return;
-    const thesis = conv.theses.find((option) => option.id === conv.selectedThesis);
-    if (!thesis) return;
-
+  const runPrototypePipeline = useCallback(async (source: Conversation, briefInstruction: string) => {
     setGenerating(true);
     try {
-      let spec = conv.spec;
-      if (!spec || !conv.thesisLocked) {
-        const brief = await runForgeTurn(
-          conv,
-          `I choose ${thesis.title}. Generate a lean Build Brief that focuses on testing the riskiest mechanism.`,
-          "lock-thesis",
-        );
+      let spec = source.spec;
+      if (!spec || !source.thesisLocked) {
+        const brief = await runForgeTurn(source, briefInstruction, "lock-thesis");
         if (!brief.spec) throw new Error("The build brief was incomplete.");
         spec = brief.spec;
-        setConversations((list) => list.map((item) => item.id === conv.id ? {
+        setConversations((list) => list.map((item) => item.id === source.id ? {
           ...item,
           spec,
           thesisLocked: true,
@@ -698,20 +691,14 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         } : item));
       }
 
-      const chosen = {
-        ...conv,
-        spec,
-        thesisLocked: true,
-        stage: "brief" as ProjectStage,
-      };
       const built = await runForgeTurn(
-        chosen,
-        "Prototype the chosen product's riskiest interaction. Make it interactive and self-contained, not a generic dashboard.",
+        { ...source, spec, thesisLocked: true, stage: "brief" as ProjectStage },
+        "Build the smallest working prototype that tests the highest-risk user interaction in the chosen brief and stress test. No decorative dashboard or fake integrations.",
         "prototype",
       );
       if (!built.prototype) throw new Error("The prototype was incomplete.");
       const prototype = built.prototype;
-      setConversations((list) => list.map((item) => item.id === conv.id ? {
+      setConversations((list) => list.map((item) => item.id === source.id ? {
         ...item,
         spec,
         thesisLocked: true,
@@ -719,17 +706,39 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         stage: "prototype",
         updatedAt: Date.now(),
       } : item));
-      toast({ title: "Prototype ready", body: "Use it to test the chosen product mechanism, not to claim market validation.", tone: "success" });
+      toast({
+        title: "Prototype ready",
+        body: "Use this to test the product mechanism. A working demo is not market validation.",
+        tone: "success",
+      });
     } catch (error) {
       toast({
         title: "Prototype generation stopped",
-        body: error instanceof Error ? error.message.slice(0, 180) : "Your project and any completed brief were saved.",
+        body: error instanceof Error ? error.message.slice(0, 180) : "Your project and any completed brief remain saved.",
         tone: "danger",
       });
     } finally {
       setGenerating(false);
     }
-  }, [conv, generating, toast]);
+  }, [toast]);
+
+  const prototypeCurrentIdea = useCallback(() => {
+    if (!conv?.stressTest || generating) return;
+    void runPrototypePipeline(
+      { ...conv, spec: null, thesisLocked: false },
+      "Prototype the current product idea, not a new idea. Turn the highest-risk experiment from the stress test into a tightly scoped V1 Build Brief. The demo must show that interaction. Do not pretend this has validated demand.",
+    );
+  }, [conv, generating, runPrototypePipeline]);
+
+  const buildChosenPrototype = useCallback(() => {
+    if (!conv || generating) return;
+    const thesis = conv.theses.find((option) => option.id === conv.selectedThesis);
+    if (!thesis) return;
+    void runPrototypePipeline(
+      conv,
+      `I choose ${thesis.title}. Create a focused V1 Build Brief around this mechanism and the stress test's highest-risk assumption.`,
+    );
+  }, [conv, generating, runPrototypePipeline]);
 
   const copySpec = useCallback(() => {
     if (!conv?.spec) return;
