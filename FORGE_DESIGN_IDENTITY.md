@@ -1,27 +1,33 @@
-# Forge Visual Identity — v1
+# Forge Visual Identity v2 — Soft Precision
 
-Source: user-provided `DESIGN-x.ai.md` (inspired interpretation of xAI visual language).
+Date: 2026-10-08
 
-## Identity
-**Engineered clarity.** An AI product validation workspace that presents complex thinking with unusual restraint. The aesthetic should feel precise, research-grade and quiet, not like a template dashboard.
+## Product framing
+Forge helps someone **stress-test a product idea before building it**. The UI should move attention from hypothesis to the assumptions that could break it, then to an experiment and interactive prototype. Visual effects communicate that progression; they are not a substitute for it.
 
-## Design contract
-- Dark-only application canvas: `#0a0a0a`.
-- Surface layers: `#191919` for rare contained objects, `#1a1c20` for inputs/hover, hairline `#212327`; no routine elevation shadows.
-- Foreground: `#fff` for key headings/actions, `#dadbdf` for body, `#a2a5aa` for secondary, `#7d8187` for disabled/quiet metadata.
-- Brand color is monochrome first. Sunset `#ff7a17` is a controlled signature reserved for the Forge symbol, listening/processing and select illustrative moments; never paint whole card backgrounds with it.
-- Display sans: open-source Inter/Geist or system sans fallback, **400 weight**, negative tracking. Do not bundle proprietary Universal Sans.
-- Tracked monospace labels (12–14px, approximately .12em tracking) only when a technical label has semantic value.
-- Buttons: pill silhouettes; the primary action is white on near-black, secondary actions are translucent outlined pills.
-- Cards: when necessary, 8px radius, hairline border, little to no shadow. Prefer whitespace and separators to nests of cards.
-- Base spacing: 4px scale; align horizontal and vertical rhythm across all major surfaces.
-- Hero: large regular-weight title and one strong action. Do not add arbitrary gradients, ornaments, or busy marketing component grids.
-- Focus indicators must remain perceivable to keyboard users; restraint must not remove accessibility.
-- Animation should communicate state and feel physically light. Prefer quick subtle opacity/translation and purposeful listening/processing feedback. Respect reduced-motion settings.
-- Prototype preview is visually distinct from Forge’s chrome because it represents **the user’s product**, not Forge’s own interface.
+## Primary visual language
+- Deep graphite canvas `#101116`, raised panel `#1b1e26`, insets `#242832`.
+- Body foreground `#e0e1e6`, bright white for key headings and actions, quiet secondary `#a9aebc`.
+- Restrained warm accent `#e5a17f` for Forge identity, selected analysis detail, and dictation. No orange outline around a whole input.
+- Neutral hairline separators and rare visible borders. Use hierarchy and space before new cards.
+- Soft component radii: 28px composer, 20–24px primary artifact panels, 12–16px small utilities, full pills for primary actions.
+- One balanced type system, not tiny all-uppercase copy everywhere. Display text has moderate tracking and regular weight; body content stays comfortably 15–18px.
+- Explicit keyboard focus on actions; composer uses a restrained high-contrast surface change rather than a highly saturated focus stroke.
 
-## Non-goals of this pass
-This identity deliberately does not redefine Forge's user journey, validation claims, research behavior, AI prompting, or prototype generation. Those require separate UX and system-design work.
+## Motion
+The project installs and locks **Motion for React**, imported from `motion/react`. Use shared layout animations only where selection changes meaning:
+- Home's Idea → Pressure point → Experiment explainer, which demonstrates the value proposition.
+- Main workbench view transitions, so the previous mental context is not abruptly discarded.
+- Selection changing between pressure points and alternative mechanisms.
+- Composer feedback, dictation state, and toast notifications.
 
-## Future visual QA
-For every new screen, check: Is the hierarchy legible at 100% zoom? Is any color decorative rather than informative? Is a card replacing whitespace without purpose? Are controls consistent with the pill shape grammar? Does the layout remain clear at mobile width? Is the interaction discoverable without a tutorial?
+Never animate entire pages simply to signal polish. Favor restrained opacity, transform and shared-selection movement. Respect `prefers-reduced-motion` through Motion's `useReducedMotion` hook and the CSS fallback.
+
+## UI quality bar
+A reviewer should be able to identify the current hypothesis, what action to take, and what artifact emerges without reading helper paragraphs or learning an internal PM framework. Distinguish actual evidence from the model's inferred assumptions. Maintain action-specific loading, failure and retry states.
+
+## Non-negotiable engineering bar
+The first Gemini analysis must complete on a real deployment, not only mocked tests. Preview lacks `Gemini_key` as observed in the deployment health check; production configuration must also be confirmed. Do not claim a working product merely because the Vite build passes.
+
+## Reference intent
+Borrowed patterns from high-quality SaaS: focused visual hierarchy, minimal irreversible choices, meaningful interaction state, human-legible output, and prototype previews. Do not clone an unrelated chatbot or reintroduce mandatory Frame → Challenge → Decide → Brief → Prototype wizards.
