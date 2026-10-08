@@ -7,7 +7,7 @@ type Env = {
   ASSETS: AssetsBinding;
 };
 
-type TurnMode = "chat" | "research" | "directions" | "lock-thesis" | "prototype";
+type TurnMode = "chat" | "research" | "stress-test" | "directions" | "lock-thesis" | "prototype";
 
 type TurnBody = {
   mode?: TurnMode;
@@ -226,6 +226,45 @@ const researchSchema = {
   required: ["summary", "signals", "alternatives", "unresolved"],
 };
 
+const stressTestSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    thesis: { type: "string" },
+    strongestCounterargument: { type: "string" },
+    recommendation: { type: "string", enum: ["investigate", "reframe", "proceed-to-test"] },
+    recommendationReason: { type: "string" },
+    findings: {
+      type: "array", minItems: 3, maxItems: 4,
+      items: {
+        type: "object", additionalProperties: false,
+        properties: {
+          id: { type: "string" },
+          risk: { type: "string", enum: ["value", "usability", "feasibility", "viability"] },
+          title: { type: "string" },
+          assumption: { type: "string" },
+          whyItMatters: { type: "string" },
+          falsification: { type: "string" },
+          fastestTest: { type: "string" },
+          evidenceState: { type: "string", enum: ["missing", "partial", "contested"] },
+        },
+        required: ["id", "risk", "title", "assumption", "whyItMatters", "falsification", "fastestTest", "evidenceState"],
+      },
+    },
+    firstExperiment: {
+      type: "object", additionalProperties: false,
+      properties: {
+        hypothesis: { type: "string" },
+        method: { type: "string" },
+        successSignal: { type: "string" },
+        stopSignal: { type: "string" },
+      },
+      required: ["hypothesis", "method", "successSignal", "stopSignal"],
+    },
+  },
+  required: ["thesis", "strongestCounterargument", "recommendation", "recommendationReason", "findings", "firstExperiment"],
+};
+
 const prototypeSchema = {
   type: "object",
   additionalProperties: false,
@@ -265,6 +304,21 @@ const specSchema = {
 };
 
 function structuredFormat(mode: TurnMode) {
+  if (mode === "stress-test") {
+    return {
+      type: "json_schema",
+      json_schema: {
+        name: "forge_adversarial_stress_test",
+        strict: true,
+        schema: {
+          type: "object", additionalProperties: false,
+          properties: { reply: { type: "string" }, stressTest: stressTestSchema },
+          required: ["reply", "stressTest"],
+        },
+      },
+    };
+  }
+
   if (mode === "research") {
     return {
       type: "json_schema",
@@ -423,6 +477,27 @@ OUTPUT
 - reply: a concise 1-3 sentence conversational takeaway. Do not repeat the whole report.`;
   }
 
+  if (mode === "stress-test") {
+    return `${core}
+
+FORGE STRESS TEST. You are an adversarial senior product leader, not an idea cheerleader.
+Your task is to expose what could make THIS SPECIFIC IDEA fail before its user invests in implementation.
+
+- Start with the user's actual desired outcome, workaround, switching friction and constraints.
+- Produce 3 to 4 distinct decision-changing, falsifiable assumptions. Vary across desirability, usability, feasibility, or viability only where relevant.
+- Do NOT invent studies, interviews, market demand, adoption statistics, prices, or engineering capabilities.
+- Look for the non-obvious second-order failure: even if the feature technically works, will the desired business/user outcome occur?
+- For every finding, say exactly what needs to be true, why it matters, what observation would falsify it, and a low-cost test a real person could run.
+- Evidence states must reflect ACTUAL input/research: missing when not evidenced; partial only if some real evidence was supplied; contested when known contradictory signals are present.
+- Rank findings in descending order of how badly being wrong would undermine the entire product.
+- The first experiment must test the highest-consequence uncertain assumption and state observable success AND stopping signals; never invent numeric cutoffs.
+- recommendation can be "proceed-to-test" (not "validated"), "investigate", or "reframe". Explain the tradeoff and what could change the recommendation.
+- The strongest counterargument should be uncomfortable, specific and credible. Avoid vague "there could be competition" phrases.
+- Do not automatically suggest an AI assistant, generic dashboard or marketplace.
+- Reply in one short sentence. All substantial reasoning belongs in structured output.
+`;
+  }
+
   if (mode === "directions") {
     return `${core}
 
@@ -570,7 +645,7 @@ async function handleTurn(request: Request, env: Env): Promise<Response> {
   }
 
   const mode: TurnMode =
-    body.mode === "research" || body.mode === "directions" || body.mode === "lock-thesis" || body.mode === "prototype"
+    body.mode === "research" || body.mode === "stress-test" || body.mode === "directions" || body.mode === "lock-thesis" || body.mode === "prototype"
       ? body.mode
       : "chat";
   const message = typeof body.message === "string" ? body.message.trim() : "";
