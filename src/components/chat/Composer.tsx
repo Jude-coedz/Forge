@@ -105,10 +105,10 @@ export function Composer({
       <div
         className={
           "group border bg-raised transition-[border-color,box-shadow] duration-200 " +
-          (compact ? "rounded-[18px] p-2.5 " : "rounded-[24px] p-3 ") +
+          (compact ? "rounded-lg p-2.5 " : "rounded-lg p-3 ") +
           (listening
             ? "border-line-strong shadow-[var(--shadow-listening)]"
-            : "border-line focus-within:border-line-strong focus-within:shadow-[var(--shadow-focus)]")
+            : "border-line focus-within:border-line-strong")
         }
       >
         <textarea
@@ -158,7 +158,7 @@ export function Composer({
             type="submit"
             disabled={!f.composer.trim() || f.generating}
             className={
-              "grid shrink-0 place-items-center rounded-full bg-ink text-canvas transition-transform duration-150 enabled:hover:scale-[1.04] enabled:active:scale-[0.97] disabled:opacity-25 " +
+              "grid shrink-0 place-items-center rounded-full bg-white text-black transition-transform duration-150 enabled:hover:scale-[1.03] enabled:active:scale-[0.97] disabled:opacity-25 " +
               (compact ? "size-9" : "size-10")
             }
             aria-label="Send to Forge"
