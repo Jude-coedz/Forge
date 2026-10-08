@@ -38,11 +38,11 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[236px] flex-col border-r border-line bg-canvas transition-transform duration-200 md:static md:z-0 md:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col border-r border-line bg-canvas transition-transform duration-200 md:static md:z-0 md:translate-x-0",
           f.sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
       >
-        <div className="flex h-12 items-center px-3.5">
+        <div className="flex h-14 items-center px-4">
           <button
             type="button"
             onClick={f.newProject}
@@ -50,7 +50,7 @@ export function Sidebar() {
             aria-label="Forge home"
           >
             <ForgeMark className="size-7" />
-            <span className="text-[14px] font-semibold tracking-[-0.015em] text-ink">Forge</span>
+            <span className="text-[15px] font-normal tracking-[-0.02em] text-ink">Forge</span>
           </button>
         </div>
 
@@ -61,7 +61,7 @@ export function Sidebar() {
               f.newProject();
               setMenuId(null);
             }}
-            className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-[14px] font-medium text-ink-2 transition hover:bg-inset hover:text-ink"
+            className="flex h-9 w-full items-center gap-2 rounded-full px-3 text-[14px] font-normal text-ink-2 transition hover:bg-inset hover:text-ink"
           >
             <Plus className="size-4" />
             New idea
@@ -86,7 +86,7 @@ export function Sidebar() {
                 <div key={project.id} className="group relative">
                   <div
                     className={cn(
-                      "flex min-h-[40px] w-full items-center gap-2 rounded-lg px-2.5 text-left transition",
+                      "flex min-h-[40px] w-full items-center gap-2 rounded-lg px-3 text-left transition",
                       active ? "bg-inset text-ink" : "text-ink-3 hover:bg-inset/70 hover:text-ink",
                     )}
                   >
