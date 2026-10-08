@@ -109,6 +109,32 @@ export type ResearchAlternative = {
   relevance: string;
 };
 
+export type StressFinding = {
+  id: string;
+  risk: ProductRisk;
+  title: string;
+  assumption: string;
+  whyItMatters: string;
+  falsification: string;
+  fastestTest: string;
+  evidenceState: "missing" | "partial" | "contested";
+};
+
+export type StressTestReport = {
+  createdAt: number;
+  thesis: string;
+  strongestCounterargument: string;
+  recommendation: "investigate" | "reframe" | "proceed-to-test";
+  recommendationReason: string;
+  findings: StressFinding[];
+  firstExperiment: {
+    hypothesis: string;
+    method: string;
+    successSignal: string;
+    stopSignal: string;
+  };
+};
+
 export type MarketResearch = {
   summary: string;
   signals: ResearchSignal[];
@@ -147,6 +173,7 @@ export type Conversation = {
   sources: string[];
   productModel: ProductModel;
   research: MarketResearch | null;
+  stressTest: StressTestReport | null;
   theses: ThesisOption[];
   selectedThesis: ThesisId;
   thesisLocked: boolean;
