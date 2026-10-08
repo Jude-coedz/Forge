@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Menu, Moon, Sun } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useForge } from "../../store/ForgeContext";
 import { Welcome } from "../chat/Welcome";
 import { ForgeWorkspace } from "../workspace/ForgeWorkspace";
@@ -21,7 +21,7 @@ export function AppShell() {
   }, [f.newProject]);
 
   return (
-    <div className={f.theme === "dark" ? "dark" : ""}>
+    <div className="dark">
       <div className="relative flex h-dvh overflow-hidden bg-canvas text-ink">
         <Sidebar />
         <div className="relative flex min-w-0 flex-1 flex-col">
@@ -63,10 +63,6 @@ function TopBar() {
           Thinking
         </span>
       )}
-
-      <Button size="icon" variant="ghost" onClick={f.toggleTheme} aria-label="Toggle appearance">
-        {f.theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-      </Button>
     </header>
   );
 }
