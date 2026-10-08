@@ -78,26 +78,24 @@ export function Composer({
     recognition.interimResults = true;
     recognition.lang = "en-US";
 
-    let committed = f.composer.trim();
+    const initialText = f.composer.trim();
 
+    // Results may contain all earlier final segments on every callback. Rebuild
+    // from the initial input instead of appending finals twice.
     recognition.onresult = (event) => {
-      let interim = "";
+      const segments: string[] = [];
       for (let index = 0; index < event.results.length; index += 1) {
-        const result = event.results[index];
-        if (result.isFinal) {
-          committed = (committed + " " + result[0].transcript).trim();
-        } else {
-          interim += result[0].transcript;
-        }
+        const transcript = event.results[index]?.[0]?.transcript;
+        if (transcript) segments.push(transcript.trim());
       }
-      f.setComposer((committed + " " + interim).trim());
+      f.setComposer([initialText, ...segments].filter(Boolean).join(" "));
     };
 
     recognition.onend = () => setListening(false);
     recognition.onerror = () => setListening(false);
     recognitionRef.current = recognition;
     setListening(true);
-    recognition.start();
+    try { recognition.start(); } catch { setListening(false); }
   };
 
   return (
