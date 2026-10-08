@@ -1,0 +1,50 @@
+name: Verify Forge preview API
+
+on:
+  push:
+    branches: [fix-gemini-runtime-and-ui]
+    paths: [.github/workflows/smoke-preview.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check Gemini via deployed Forge API
+        run: |
+          node --input-type=module <<'NODE'
+          const origin = "https://forge-git-fix-gemini-runtime-and-ui-eeakede-9301.vercel.app";
+          const url = origin + "/api/forge/turn";
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 115000);
+          try {
+            const health = await fetch(url, { signal: controller.signal });
+            const healthText = await health.text();
+            console.log("GET health status:", health.status);
+            console.log("GET health response:", healthText.slice(0, 350));
+            if (!health.ok || !healthText.includes('"runtime":"node"')) throw Error("Health check failed.");
+            if (!healthText.includes('"configured":true')) throw Error("Gemini environment not configured.");
+
+            const idea = "Freelancers often follow up on late invoices manually. I want a tool that sends reminders, but I don't know whether they will import their invoices.";
+            const conversation = { messages: [{ role: "user", text: idea }], productModel: {}, sources: [idea] };
+            const began = Date.now();
+            const analyzed = await fetch(url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ mode: "chat", message: idea, conversation }),
+              signal: controller.signal,
+            });
+            const analysisText = await analyzed.text();
+            console.log("POST idea status:", analyzed.status, "durationMs:", Date.now() - began);
+            console.log("POST idea result:", analysisText.slice(0, 1100));
+            if (!analyzed.ok) throw Error("First idea failed.");
+            const output = JSON.parse(analysisText);
+            if (!output.productModel?.summary) throw Error("No usable hypothesis.");
+            console.log("SMOKE CHECK PASSED: configured Node API and actual Gemini idea analysis.");
+          } finally {
+            clearTimeout(timeout);
+          }
+          NODE
