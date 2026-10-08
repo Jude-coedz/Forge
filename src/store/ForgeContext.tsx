@@ -227,6 +227,7 @@ type ForgeContextValue = {
   renameConversation: (id: string, title: string) => void;
   deleteConversation: (id: string) => void;
   sendChat: (text?: string) => void;
+  retryIdea: () => void;
   researchIdea: () => void;
   stressTestIdea: () => void;
   advanceToDirections: () => void;
@@ -455,13 +456,53 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
           tone: "warn",
         });
       }
-    } catch {
+    } catch (error) {
       failAction(
-        "Forge could not update this project",
-        "Your input is saved. Retry when ready; nothing in the project was deleted.",
+        "Forge could not analyze this idea",
+        error instanceof Error ? error.message : "Your input is saved. Use Retry analysis to continue.",
       );
     }
   }, [activeId, appendAssistant, composer, conv, failAction, generating, toast]);
+
+  const retryIdea = useCallback(async () => {
+    if (!conv || generating) return;
+    const lastInput = [...conv.messages].reverse().find((item) => item.role === "user")?.text;
+    if (!lastInput) return;
+
+    setGenerating(true);
+    try {
+      const result = await runForgeTurn(conv, lastInput, "chat");
+      if (!result.productModel || (!result.productModel.summary && !result.productModel.opportunity)) {
+        throw new Error("Gemini did not produce a usable hypothesis.");
+      }
+      setConversations((list) => list.map((item) => {
+        if (item.id !== conv.id) return item;
+        const productName = result.productName || item.productName;
+        return {
+          ...item,
+          productName,
+          title: item.title === "New project" ? (productName || item.title) : item.title,
+          productModel: result.productModel ?? item.productModel,
+          stressTest: null,
+          research: null,
+          theses: [],
+          spec: null,
+          prototype: null,
+          stage: "frame",
+          updatedAt: Date.now(),
+        };
+      }));
+      appendAssistant(conv.id, result.reply);
+    } catch (error) {
+      toast({
+        title: "Forge could not analyze this yet",
+        body: error instanceof Error ? error.message : "Your idea remains saved. Retry the analysis.",
+        tone: "danger",
+      });
+    } finally {
+      setGenerating(false);
+    }
+  }, [appendAssistant, conv, generating, toast]);
 
   const researchIdea = useCallback(async () => {
     if (!conv || generating) return;
@@ -781,6 +822,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     renameConversation,
     deleteConversation,
     sendChat,
+    retryIdea,
     researchIdea,
     stressTestIdea,
     advanceToDirections,
@@ -811,6 +853,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     renameConversation,
     deleteConversation,
     sendChat,
+    retryIdea,
     researchIdea,
     stressTestIdea,
     advanceToDirections,
