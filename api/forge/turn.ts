@@ -1,26 +1,37 @@
-import worker from "../../worker/index";
+declare const process: { env: Record<string, string | undefined> };
 
-declare const process: {
-  env: Record<string, string | undefined>;
-};
-
-// Gemini structured reasoning is a real backend workload. Running it in Vercel's
-// Edge runtime caused gateway timeouts because the entire completion was awaited
-// without sending a response. The Node runtime has an explicit execution budget.
+// A long-running AI request must not use the Vercel Edge idle timeout.
 export const maxDuration = 120;
 
-const missingAssets = {
+const unavailableAssets = {
   fetch: async () => new Response("Not found.", { status: 404 }),
 };
 
-// Vercel Node.js Functions accept the standard Web Request/Response API.
-export default {
-  fetch(request: Request) {
+// Default function export is the most broadly compatible Vercel Node handler.
+// A health check is intentionally independent of importing Gemini/worker code.
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method === "GET") {
+    return Response.json({
+      status: "ok",
+      runtime: "node",
+      provider: "gemini",
+      configured: Boolean(process.env.Gemini_key || process.env.Gemini_Key),
+    }, { headers: { "Cache-Control": "no-store" } });
+  }
+
+  try {
+    const { default: worker } = await import("../../worker/index");
     return worker.fetch(request, {
       Gemini_key: process.env.Gemini_key ?? "",
       Gemini_Key: process.env.Gemini_Key ?? "",
       GEMINI_MODEL: process.env.GEMINI_MODEL,
-      ASSETS: missingAssets,
+      ASSETS: unavailableAssets,
     });
-  },
-};
+  } catch (error) {
+    console.error("forge.function.failure", error instanceof Error ? error.name : "unknown");
+    return Response.json({
+      error: "The reasoning worker could not start. Your idea is saved.",
+      code: "WORKER_INIT_FAILED",
+    }, { status: 500 });
+  }
+}
