@@ -1,0 +1,31 @@
+name: Install Motion dependency
+
+on:
+  push:
+    branches: [fix-gemini-runtime-and-ui]
+    paths:
+      - .github/workflows/sync-motion.yml
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install motion@^12 --save
+      - name: Commit lockfile and dependency
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: install Motion for React with locked dependencies"
+            git push
+          fi

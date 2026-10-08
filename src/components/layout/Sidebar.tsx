@@ -31,7 +31,7 @@ export function Sidebar() {
     <>
       {f.sidebarOpen && (
         <button
-          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px] md:hidden"
+          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-[4px] md:hidden"
           type="button"
           aria-label="Close projects"
           onClick={() => f.setSidebarOpen(false)}
@@ -52,7 +52,7 @@ export function Sidebar() {
             onClick={f.newProject}
             aria-label="Forge home"
             title="Forge home"
-            className="flex items-center gap-3 rounded-lg text-left focus-visible:outline-offset-4"
+            className="flex items-center gap-3 rounded-xl text-left focus-visible:outline-offset-4"
           >
             <ForgeMark className="size-8 shrink-0" />
             <span className={"text-[16px] font-normal tracking-[-0.02em] text-white " + (collapsed ? "md:hidden" : "")}>Forge</span>
@@ -108,7 +108,7 @@ export function Sidebar() {
                           value={draft}
                           onChange={(event) => setDraft(event.target.value)}
                           onKeyDown={(event) => { if (event.key === "Escape") setEditingId(null); }}
-                          className="min-w-0 flex-1 rounded-lg border border-line-strong bg-raised px-2 py-1 text-[13px]"
+                          className="min-w-0 flex-1 rounded-xl border border-line-strong bg-raised px-2 py-1.5 text-[13px]"
                         />
                         <button type="submit" aria-label="Save name"><Check className="size-4" /></button>
                         <button type="button" aria-label="Cancel" onClick={() => setEditingId(null)}><X className="size-4" /></button>
@@ -138,7 +138,7 @@ export function Sidebar() {
                   </div>
 
                   {menuId === project.id && !editing && (
-                    <div className="absolute right-1 top-11 z-50 w-52 rounded-lg border border-line-strong bg-[#202126] p-1.5 shadow-[0_18px_44px_rgba(0,0,0,.4)]">
+                    <div className="absolute right-1 top-11 z-50 w-52 rounded-2xl border border-line-strong bg-[#222630] p-2 shadow-[0_18px_54px_rgba(0,0,0,.48)]">
                       {confirmId === project.id ? (
                         <div className="p-2">
                           <p className="text-[13px] text-ink-2">Delete this idea and all saved work?</p>
@@ -149,7 +149,7 @@ export function Sidebar() {
                         </div>
                       ) : (
                         <>
-                          <button type="button" onClick={() => beginRename(project.id, project.title)} className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-[13px] text-ink-2 hover:bg-inset"><Pencil className="size-3.5" /> Rename</button>
+                          <button type="button" onClick={() => beginRename(project.id, project.title)} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[13px] text-ink-2 hover:bg-inset"><Pencil className="size-3.5" /> Rename</button>
                           <button type="button" onClick={() => setConfirmId(project.id)} className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-[13px] text-scorch hover:bg-inset"><Trash2 className="size-3.5" /> Delete</button>
                         </>
                       )}

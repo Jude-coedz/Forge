@@ -1,0 +1,52 @@
+name: Verify Forge preview API
+
+on:
+  push:
+    branches: [fix-gemini-runtime-and-ui]
+    paths: [.github/workflows/smoke-preview.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Test streamed Edge API and Gemini idea analysis
+        run: |
+          node --input-type=module <<'NODE'
+          const base = "https://forge-kw4e3f0kx-eeakede-9301.vercel.app";
+          async function checked(path, options = {}, ms = 15000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), ms);
+            const began = Date.now();
+            try {
+              const response = await fetch(base + path, { ...options, signal: controller.signal });
+              const text = await response.text();
+              console.log(path, "status:", response.status, "elapsedMs:", Date.now() - began);
+              console.log("body:", text.slice(0, 950));
+              return { status: response.status, body: text, data: JSON.parse(text) };
+            } finally { clearTimeout(timer); }
+          }
+          const ping = await checked("/api/ping");
+          if (ping.status !== 200 || !ping.data.ok) throw Error("Independent Edge ping failed.");
+          const health = await checked("/api/forge/turn");
+          if (health.status !== 200 || health.data.runtime !== "edge-streaming")
+            throw Error("Forge Edge health failed.");
+          if (!health.data.configured) throw Error("Gemini_key not set for Vercel preview environment.");
+
+          const idea = "Freelancers chase late invoices manually. I wonder if a reminder app would actually solve the problem or if importing invoices is too much work.";
+          const begin = Date.now();
+          const response = await checked("/api/forge/turn", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mode: "chat", message: idea,
+              conversation: { productModel: {}, recentMessages: [{ role: "user", text: idea }] },
+            }),
+          }, 80000);
+          if (response.status !== 200 || !response.data.productModel?.summary)
+            throw Error("Live Gemini idea analysis failed.");
+          console.log("GEMINI LIVE SMOKE PASSED in", Date.now() - begin, "ms");
+          NODE

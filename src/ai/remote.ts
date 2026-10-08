@@ -27,53 +27,50 @@ function compactConversation(conversation: Conversation, mode: ForgeTurnMode) {
   };
 }
 
-function wait(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-function transient(status: number) {
-  return status === 429 || status === 502 || status === 503 || status === 504;
-}
-
-const RETRY_DELAYS = [450, 1200];
-
 export class RemoteReasoningProvider implements ForgeReasoningProvider {
   readonly name = "forge-api";
 
   constructor(private readonly endpoint = "/api/forge/turn") {}
 
   async runTurn(conversation: Conversation, message: string, mode: ForgeTurnMode = "chat", signal?: AbortSignal) {
-    let lastError = "Forge could not reach its reasoning service.";
-
-    for (let attempt = 0; attempt < RETRY_DELAYS.length + 1; attempt += 1) {
-      let response: Response;
-      try {
-        response = await fetch(this.endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal,
-          body: JSON.stringify({ mode, message, conversation: compactConversation(conversation, mode) }),
-        });
-      } catch {
-        if (attempt < RETRY_DELAYS.length && !signal?.aborted) {
-          await wait(RETRY_DELAYS[attempt]);
-          continue;
-        }
-        throw new AIProviderError(lastError);
-      }
-
-      if (response.ok) return response.json();
-
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      lastError = payload?.error || `Forge reasoning failed with status ${response.status}.`;
-      if (attempt < RETRY_DELAYS.length && transient(response.status) && !signal?.aborted) {
-        await wait(RETRY_DELAYS[attempt]);
-        continue;
-      }
-
-      throw new AIProviderError(lastError);
+    // Retries and model fallback are handled on the server. Retrying a gateway
+    // timeout from the browser can multiply work and make a 30s fault a 90s fault.
+    let response: Response;
+    try {
+      response = await fetch(this.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal,
+        body: JSON.stringify({
+          mode,
+          message,
+          conversation: compactConversation(conversation, mode),
+        }),
+      });
+    } catch {
+      throw new AIProviderError("Forge could not reach its reasoning service. Your input is saved.");
     }
 
-    throw new AIProviderError(lastError);
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string;
+      code?: string;
+    } | null;
+
+    if (!response.ok) {
+      throw new AIProviderError(
+        payload?.error || (response.status === 504
+          ? "The reasoning request timed out. Your input is saved."
+          : "Reasoning failed (HTTP " + response.status + "). Your input is saved."),
+      );
+    }
+    if (!payload || typeof payload !== "object") {
+      throw new AIProviderError("Forge received an invalid response. Your input is saved.");
+    }
+    // Edge streaming starts with HTTP 200 to avoid gateway idle timeouts.
+    // The final JSON may still carry a backend error.
+    if (typeof payload.error === "string") {
+      throw new AIProviderError(payload.error);
+    }
+    return payload;
   }
 }

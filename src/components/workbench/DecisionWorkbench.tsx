@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight,
   ClipboardCopy, Code2, ExternalLink, Monitor, Pencil,
@@ -33,6 +34,7 @@ function availableViews(conv: Conversation): View[] {
 
 export function DecisionWorkbench() {
   const f = useForge();
+  const reducedMotion = useReducedMotion();
   const conv = f.conv!;
   const [view, setView] = useState<View>("hypothesis");
   const [showContext, setShowContext] = useState(false);
@@ -78,8 +80,17 @@ export function DecisionWorkbench() {
           </div>
         </div>
 
+        <AnimatePresence initial={false}>
         {showContext && (
-          <section id="forge-context-editor" className="forge-panel-enter my-5 max-w-[760px] rounded-lg border border-line-strong bg-raised p-5">
+          <motion.section
+            key="notes"
+            id="forge-context-editor"
+            initial={reducedMotion ? false : { opacity: 0, height: 0, y: -8 }}
+            animate={{ opacity: 1, height: "auto", y: 0 }}
+            exit={reducedMotion ? undefined : { opacity: 0, height: 0, y: -6 }}
+            transition={{ duration: 0.24, ease: "easeOut" }}
+            className="my-5 max-w-[760px] overflow-hidden rounded-[22px] border border-line-strong bg-raised p-5"
+          >
             <p className="text-[15px] font-medium text-ink">What did Forge miss?</p>
             <p className="mt-1 text-[13px] leading-6 text-ink-3">Add real observations, constraints, or a correction. This will update the working hypothesis, not start a separate chat.</p>
             <textarea
@@ -88,14 +99,15 @@ export function DecisionWorkbench() {
               onChange={(event) => setNote(event.target.value)}
               placeholder="For example: customers already use spreadsheets, but only once a month…"
               rows={3}
-              className="mt-4 w-full resize-y rounded-lg border border-line-strong bg-canvas p-4 text-[15px] leading-7 text-ink outline-none focus-visible:outline-offset-2"
+              className="mt-4 w-full resize-y rounded-[16px] border border-line-strong bg-canvas p-4 text-[15px] leading-7 text-ink outline-none focus:border-white/20"
             />
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className="text-[12px] text-ink-4">Only what you provide is treated as user evidence.</span>
               <Button onClick={sendContext} disabled={!note.trim() || f.generating}>Update idea <ArrowRight className="size-4" /></Button>
             </div>
-          </section>
+          </motion.section>
         )}
+        </AnimatePresence>
 
         <nav aria-label="Decision artifacts" className="mt-6 flex flex-wrap gap-2">
           {views.map((id) => (
@@ -104,18 +116,36 @@ export function DecisionWorkbench() {
               type="button"
               onClick={() => setView(id)}
               className={
-                "rounded-full border px-4 py-2 text-[13px] transition-colors " +
+                "relative isolate overflow-hidden rounded-full border px-4 py-2 text-[13px] transition-colors " +
                 (view === id
-                  ? "border-white bg-white text-black"
+                  ? "border-transparent text-black"
                   : "border-line-strong text-ink-3 hover:border-ink-3 hover:text-ink")
               }
               aria-current={view === id ? "step" : undefined}
             >
-              {id === "hypothesis" ? "Idea" : id === "stress" ? "Stress test" : id === "directions" ? "Directions" : "Prototype"}
+              {view === id && (
+                <motion.span
+                  layoutId="forge-active-tab"
+                  transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 460, damping: 36 }}
+                  className="absolute inset-0 -z-10 rounded-full bg-white"
+                />
+              )}
+              <span className="relative z-10">
+                {id === "hypothesis" ? "Idea" : id === "stress" ? "Stress test" : id === "directions" ? "Directions" : "Prototype"}
+              </span>
             </button>
           ))}
         </nav>
 
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={view}
+            className="forge-stage"
+            initial={reducedMotion ? false : { opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reducedMotion ? undefined : { opacity: 0, y: -8 }}
+            transition={{ duration: reducedMotion ? 0 : 0.24, ease: [0.2, 0.7, 0.2, 1] }}
+          >
         {view === "hypothesis" && <HypothesisView conv={conv} onStress={() => { setView("stress"); f.stressTestIdea(); }} onResearch={() => f.researchIdea()} />}
         {view === "stress" && <StressView
           conv={conv}
@@ -125,6 +155,8 @@ export function DecisionWorkbench() {
         />}
         {view === "directions" && <DirectionsView conv={conv} onBack={() => setView("stress")} onBuild={() => { setView("prototype"); f.buildChosenPrototype(); }} />}
         {view === "prototype" && <PrototypeView conv={conv} onBack={() => setView(conv.theses.length ? "directions" : "stress")} />}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </main>
   );
@@ -166,10 +198,15 @@ function HypothesisView({
       <section className="forge-panel-enter max-w-[800px] py-14">
         <p className="forge-eyebrow text-ink-4">{f.generating ? "Extracting your idea" : "Idea saved"}</p>
         <h1 className="forge-display mt-5 text-[36px] leading-[1.12] sm:text-[54px]">
-          {f.generating ? "Finding what really needs to be true." : "Your idea is here. The analysis isn't yet."}
+          {f.generating ? "Finding what really needs to be true." : "Your idea is saved. Let's finish the analysis."}
         </h1>
-        <p className="mt-5 max-w-[670px] whitespace-pre-wrap text-[16px] leading-8 text-ink-3">{initialInput}</p>
-        {!f.generating && <p className="mt-6 text-[14px] text-ink-4">Use Add context to retry or clarify the idea. Your original input has not been lost.</p>}
+        <p className="forge-soft-panel mt-7 max-w-[670px] whitespace-pre-wrap p-6 text-[16px] leading-8 text-ink-2">{initialInput}</p>
+        {!f.generating && (
+          <div className="mt-7">
+            <p className="mb-4 text-[14px] leading-7 text-ink-3">The reasoning service didn't finish. You don't need to enter the idea again.</p>
+            <Button onClick={f.retryIdea}>Retry analysis <ArrowRight className="size-4" /></Button>
+          </div>
+        )}
         {f.generating && <ProcessingBar label="Building your hypothesis" />}
       </section>
     );
@@ -278,7 +315,7 @@ function EditableRow({ label, value, onChange }: { label: string; value: string;
     <label className="block">
       <span className="text-[12px] text-ink-3">{label}</span>
       <textarea value={value} onChange={(event) => onChange(event.target.value)}
-        rows={2} className="mt-1.5 w-full resize-y rounded-lg border border-line-strong bg-raised p-3 text-[15px] leading-7 text-ink outline-none" />
+        rows={2} className="mt-1.5 w-full resize-y rounded-[16px] border border-line-strong bg-raised p-3.5 text-[15px] leading-7 text-ink outline-none focus:border-white/20" />
     </label>
   );
 }
@@ -289,6 +326,7 @@ function StressView({
   const f = useForge();
   const report = conv.stressTest;
   const [activeIndex, setActiveIndex] = useState(0);
+  const reducedMotion = useReducedMotion();
   const current = report?.findings[activeIndex] || report?.findings[0];
 
   if (!report || !current) return <PendingScreen title="Finding the idea's breaking points" subtitle="Not a confidence score. Forge is looking for the assumptions that would make building this a mistake." busy={f.generating} onRetry={f.stressTestIdea} />;
@@ -302,16 +340,23 @@ function StressView({
         <p className="mt-3 text-[13px] text-ink-4">Reasoned risks, not proof that the idea will fail.</p>
       </div>
 
-      <div className="mt-11 grid overflow-hidden rounded-lg border border-line-strong bg-raised lg:grid-cols-[minmax(260px,.72fr)_minmax(0,1.28fr)]">
+      <div className="mt-11 grid overflow-hidden rounded-[24px] border border-line-strong bg-raised shadow-[0_24px_80px_rgba(0,0,0,.18)] lg:grid-cols-[minmax(260px,.72fr)_minmax(0,1.28fr)]">
         <div className="border-b border-line lg:border-b-0 lg:border-r">
           <div className="border-b border-line px-5 py-4"><span className="forge-eyebrow text-ink-4">Pressure points / {report.findings.length}</span></div>
           {report.findings.map((item, index) => (
             <button key={item.id} type="button" onClick={() => setActiveIndex(index)}
               className={
-                "flex w-full items-start gap-4 border-b border-line px-5 py-5 text-left transition-colors last:border-0 " +
-                (item.id === current.id ? "bg-[#25272b] text-white" : "text-ink-3 hover:bg-inset hover:text-white")
+                "relative isolate flex w-full items-start gap-4 border-b border-line px-5 py-5 text-left transition-colors last:border-0 " +
+                (item.id === current.id ? "text-white" : "text-ink-3 hover:bg-inset hover:text-white")
               }
               aria-pressed={item.id === current.id}>
+              {item.id === current.id && (
+                <motion.span
+                  layoutId="active-pressure-point"
+                  transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 39 }}
+                  className="absolute inset-1 -z-10 rounded-[18px] bg-[#292e39]"
+                />
+              )}
               <span className="font-mono text-[12px] text-ink-4">{String(index + 1).padStart(2, "0")}</span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] leading-6">{item.title}</span>
@@ -321,7 +366,15 @@ function StressView({
             </button>
           ))}
         </div>
-        <article key={current.id} className="forge-detail-enter min-h-[450px] p-6 sm:p-9">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.article
+            key={current.id}
+            initial={reducedMotion ? false : { opacity: 0, y: 9 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reducedMotion ? undefined : { opacity: 0, y: -7 }}
+            transition={{ duration: reducedMotion ? 0 : 0.2, ease: "easeOut" }}
+            className="min-h-[450px] p-6 sm:p-9"
+          >
           <span className="forge-eyebrow text-ink-4">{evidenceLabels[current.evidenceState]} / {riskLabels[current.risk]}</span>
           <h2 className="forge-display mt-5 text-[30px] leading-[1.15] text-white sm:text-[40px]">{current.assumption}</h2>
           <div className="mt-8 grid gap-7 sm:grid-cols-2">
@@ -332,7 +385,8 @@ function StressView({
             <span className="forge-eyebrow text-ink-4">Cheapest test</span>
             <p className="mt-3 max-w-[620px] text-[16px] leading-7 text-ink-2">{current.fastestTest}</p>
           </div>
-        </article>
+          </motion.article>
+        </AnimatePresence>
       </div>
 
       <div className="mt-9 grid gap-8 border-t border-line pt-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,.6fr)]">
@@ -398,8 +452,15 @@ function DirectionsView({
 }
 
 function DirectionChoice({ option, number, selected, onClick }: { option: ThesisOption; number: number; selected: boolean; onClick: () => void }) {
+  const reducedMotion = useReducedMotion();
   return (
-    <button type="button" onClick={onClick} aria-pressed={selected}
+    <motion.button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      whileHover={reducedMotion ? undefined : { y: -3 }}
+      whileTap={reducedMotion ? undefined : { scale: 0.985 }}
+      transition={{ type: "spring", stiffness: 360, damping: 29 }}
       className={"flex min-h-[335px] flex-col rounded-lg border p-6 text-left transition-[background-color,border-color,transform] duration-200 " +
         (selected ? "border-white bg-raised" : "border-line-strong bg-[#101113] hover:-translate-y-0.5 hover:border-ink-3")}>
       <div className="flex items-center justify-between gap-3">
@@ -412,7 +473,7 @@ function DirectionChoice({ option, number, selected, onClick }: { option: Thesis
         <span className="forge-eyebrow text-ink-4">{option.recommended ? "Forge recommendation" : "Most important tradeoff"}</span>
         <p className="mt-2 text-[13px] leading-6 text-ink-3">{option.risks[0] || "The main risk needs further evidence."}</p>
       </div>
-    </button>
+    </motion.button>
   );
 }
 
@@ -435,7 +496,7 @@ function PrototypeView({ conv, onBack }: { conv: Conversation; onBack: () => voi
           <Button variant="secondary" onClick={f.copyPrototype}><Code2 className="size-4" /> Copy HTML</Button>
         </div>
       </div>
-      <div className="mt-7 flex min-h-[620px] justify-center overflow-x-auto rounded-lg border border-line-strong bg-[#15161a] p-4 sm:p-6">
+      <div className="mt-7 flex min-h-[620px] justify-center overflow-x-auto rounded-[24px] border border-line-strong bg-[#15161a] p-4 sm:p-6">
         <div className={"overflow-hidden bg-white transition-[width,border-radius] duration-300 " +
           (viewport === "mobile" ? "h-[710px] w-[390px] max-w-full rounded-[25px] border-[7px] border-[#35373b]" : "h-[710px] w-full rounded-lg")}>
           <iframe key={conv.prototype.builtAt + viewport} title="Interactive product prototype" srcDoc={securedHtml} sandbox="allow-scripts allow-modals" className="h-full w-full border-0 bg-white" />

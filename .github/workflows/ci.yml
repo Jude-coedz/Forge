@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "feat/**"]
+    branches: [main, "feat/**", fix-gemini-runtime-and-ui]
   pull_request:
     branches: [main]
 
@@ -19,5 +19,7 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
+      - name: Test
+        run: npm test
       - name: Build
         run: npm run build

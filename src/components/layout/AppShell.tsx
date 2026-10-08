@@ -1,4 +1,5 @@
 import { Menu } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useForge } from "../../store/ForgeContext";
 import { Welcome } from "../chat/Welcome";
 import { DecisionWorkbench } from "../workbench/DecisionWorkbench";
@@ -58,17 +59,23 @@ function TopBar() {
 
 function Toasts() {
   const { toasts, dismissToast } = useForge();
-  if (!toasts.length) return null;
+  const reducedMotion = useReducedMotion();
 
   return (
     <div className="pointer-events-none fixed bottom-4 right-4 z-[90] flex w-[360px] max-w-[calc(100%-2rem)] flex-col gap-2">
+      <AnimatePresence initial={false}>
       {toasts.map((toast) => (
-        <button
+        <motion.button
+          layout
+          initial={reducedMotion ? false : { opacity: 0, y: 16, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={reducedMotion ? undefined : { opacity: 0, x: 20, scale: 0.97 }}
+          transition={{ type: "spring", stiffness: 400, damping: 32 }}
           key={toast.id}
           type="button"
           onClick={() => dismissToast(toast.id)}
           className={
-            "forge-enter pointer-events-auto rounded-[14px] border bg-raised px-4 py-3 text-left shadow-[var(--shadow-toast)] " +
+             "forge-toast pointer-events-auto rounded-[20px] border bg-[#242832] px-5 py-4 text-left shadow-[var(--shadow-toast)] " +
             (toast.tone === "success"
               ? "border-temper/30"
               : toast.tone === "warn"
@@ -80,8 +87,9 @@ function Toasts() {
         >
           <p className="text-[13px] font-medium">{toast.title}</p>
           {toast.body && <p className="mt-1 text-[12px] leading-5 text-ink-3">{toast.body}</p>}
-        </button>
+        </motion.button>
       ))}
+      </AnimatePresence>
     </div>
   );
 }
