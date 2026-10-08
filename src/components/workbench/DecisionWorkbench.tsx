@@ -326,6 +326,7 @@ function StressView({
   const f = useForge();
   const report = conv.stressTest;
   const [activeIndex, setActiveIndex] = useState(0);
+  const reducedMotion = useReducedMotion();
   const current = report?.findings[activeIndex] || report?.findings[0];
 
   if (!report || !current) return <PendingScreen title="Finding the idea's breaking points" subtitle="Not a confidence score. Forge is looking for the assumptions that would make building this a mistake." busy={f.generating} onRetry={f.stressTestIdea} />;
@@ -345,10 +346,17 @@ function StressView({
           {report.findings.map((item, index) => (
             <button key={item.id} type="button" onClick={() => setActiveIndex(index)}
               className={
-                "flex w-full items-start gap-4 border-b border-line px-5 py-5 text-left transition-colors last:border-0 " +
-                (item.id === current.id ? "bg-[#25272b] text-white" : "text-ink-3 hover:bg-inset hover:text-white")
+                "relative isolate flex w-full items-start gap-4 border-b border-line px-5 py-5 text-left transition-colors last:border-0 " +
+                (item.id === current.id ? "text-white" : "text-ink-3 hover:bg-inset hover:text-white")
               }
               aria-pressed={item.id === current.id}>
+              {item.id === current.id && (
+                <motion.span
+                  layoutId="active-pressure-point"
+                  transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 39 }}
+                  className="absolute inset-1 -z-10 rounded-[18px] bg-[#292e39]"
+                />
+              )}
               <span className="font-mono text-[12px] text-ink-4">{String(index + 1).padStart(2, "0")}</span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] leading-6">{item.title}</span>
@@ -358,7 +366,15 @@ function StressView({
             </button>
           ))}
         </div>
-        <article key={current.id} className="forge-detail-enter min-h-[450px] p-6 sm:p-9">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.article
+            key={current.id}
+            initial={reducedMotion ? false : { opacity: 0, y: 9 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reducedMotion ? undefined : { opacity: 0, y: -7 }}
+            transition={{ duration: reducedMotion ? 0 : 0.2, ease: "easeOut" }}
+            className="min-h-[450px] p-6 sm:p-9"
+          >
           <span className="forge-eyebrow text-ink-4">{evidenceLabels[current.evidenceState]} / {riskLabels[current.risk]}</span>
           <h2 className="forge-display mt-5 text-[30px] leading-[1.15] text-white sm:text-[40px]">{current.assumption}</h2>
           <div className="mt-8 grid gap-7 sm:grid-cols-2">
@@ -369,7 +385,8 @@ function StressView({
             <span className="forge-eyebrow text-ink-4">Cheapest test</span>
             <p className="mt-3 max-w-[620px] text-[16px] leading-7 text-ink-2">{current.fastestTest}</p>
           </div>
-        </article>
+          </motion.article>
+        </AnimatePresence>
       </div>
 
       <div className="mt-9 grid gap-8 border-t border-line pt-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,.6fr)]">
@@ -435,8 +452,15 @@ function DirectionsView({
 }
 
 function DirectionChoice({ option, number, selected, onClick }: { option: ThesisOption; number: number; selected: boolean; onClick: () => void }) {
+  const reducedMotion = useReducedMotion();
   return (
-    <button type="button" onClick={onClick} aria-pressed={selected}
+    <motion.button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      whileHover={reducedMotion ? undefined : { y: -3 }}
+      whileTap={reducedMotion ? undefined : { scale: 0.985 }}
+      transition={{ type: "spring", stiffness: 360, damping: 29 }}
       className={"flex min-h-[335px] flex-col rounded-lg border p-6 text-left transition-[background-color,border-color,transform] duration-200 " +
         (selected ? "border-white bg-raised" : "border-line-strong bg-[#101113] hover:-translate-y-0.5 hover:border-ink-3")}>
       <div className="flex items-center justify-between gap-3">
@@ -449,7 +473,7 @@ function DirectionChoice({ option, number, selected, onClick }: { option: Thesis
         <span className="forge-eyebrow text-ink-4">{option.recommended ? "Forge recommendation" : "Most important tradeoff"}</span>
         <p className="mt-2 text-[13px] leading-6 text-ink-3">{option.risks[0] || "The main risk needs further evidence."}</p>
       </div>
-    </button>
+    </motion.button>
   );
 }
 
