@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, CircleHelp,
-  ClipboardCopy, Code2, ExternalLink, FileText, Menu, Monitor, Pencil,
-  RefreshCw, Search, ShieldAlert, Smartphone, Sparkles, X,
+  ArrowLeft, ArrowRight, Check, ChevronDown,
+  ClipboardCopy, Code2, ExternalLink, Monitor, Pencil,
+  RefreshCw, Search, Smartphone, X,
 } from "lucide-react";
 import { useForge } from "../../store/ForgeContext";
-import type { Conversation, ProductModel, StressFinding, ThesisOption } from "../../types";
-import { Button, SeverityBadge } from "../ui/primitives";
+import type { Conversation, StressFinding, ThesisOption } from "../../types";
+import { Button } from "../ui/primitives";
 
 type View = "hypothesis" | "stress" | "directions" | "prototype";
-type EditableField = "summary" | "primaryUser" | "opportunity" | "currentWorkaround" | "desiredOutcome";
 
 const riskLabels: Record<StressFinding["risk"], string> = {
   value: "Desirability",
