@@ -725,7 +725,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
   const prototypeCurrentIdea = useCallback(() => {
     if (!conv?.stressTest || generating) return;
     void runPrototypePipeline(
-      { ...conv, spec: null, thesisLocked: false },
+      conv,
       "Prototype the current product idea, not a new idea. Turn the highest-risk experiment from the stress test into a tightly scoped V1 Build Brief. The demo must show that interaction. Do not pretend this has validated demand.",
     );
   }, [conv, generating, runPrototypePipeline]);
