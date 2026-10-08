@@ -1,0 +1,94 @@
+name: Forge production prototype smoke
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/smoke-prototype.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prototype:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Check live brief and interactive prototype generation
+        run: |
+          node --input-type=module <<'NODE'
+          const endpoint = "https://forge-three-wine-59.vercel.app/api/forge/turn";
+          async function request(mode, conversation, message, timeoutMs = 135000) {
+            const ac = new AbortController();
+            const timer = setTimeout(() => ac.abort(), timeoutMs);
+            const start = Date.now();
+            try {
+              const response = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mode, conversation, message }),
+                signal: ac.signal,
+              });
+              const raw = await response.text();
+              const output = JSON.parse(raw);
+              console.log(mode, "status", response.status, "durationMs", Date.now() - start);
+              if (output.error) {
+                console.log(mode, "code", output.code, "message", String(output.error).slice(0,180));
+                throw Error(mode + " failed");
+              }
+              return output;
+            } finally { clearTimeout(timer); }
+          }
+
+          const context = {
+            productName: "InvoiceFollowup",
+            productModel: {
+              summary: "A lightweight tool to help freelancers follow up on overdue invoices.",
+              primaryUser: "Freelancers with occasional overdue invoices",
+              opportunity: "Manual chasing takes time and causes awkward conversations",
+              currentWorkaround: "Email and messaging",
+              desiredOutcome: "Reliable, low-friction follow-up",
+              evidence: [], assumptions: [], decisions: [], validationTasks: [],
+            },
+            stressTest: {
+              thesis: "An invoice follow-up helper",
+              strongestCounterargument: "The import friction may outweigh the benefit",
+              recommendation: "proceed-to-test",
+              recommendationReason: "Test before building",
+              findings: [{
+                id: "risk-1",risk: "value",title:"Data import",
+                assumption:"Users will import real invoice data",
+                whyItMatters:"Without import, reminders are not useful",
+                falsification:"People decline to import",
+                fastestTest:"Watch sample import sessions",
+                evidenceState:"missing"
+              }],
+              firstExperiment: {
+                hypothesis:"Freelancers can import invoices without help",
+                method:"Show the import interaction to a few freelancers",
+                successSignal:"They can complete the task unaided",
+                stopSignal:"They abandon or require repeated guidance",
+              },
+            },
+            selectedThesis: "A",
+            theses: [],
+            recentMessages: [],
+          };
+          const brief = await request(
+            "lock-thesis", context,
+            "Create a very small brief for testing an invoice import then follow-up interaction. Keep non-goals explicit."
+          );
+          if (!brief.spec?.requirements?.length) throw Error("No build brief returned");
+          console.log("BRIEF OK", brief.spec.requirements.length, "requirements");
+
+          const prototype = await request("prototype", {
+            ...context,
+            spec: brief.spec,
+            thesisLocked: true,
+            stage: "brief"
+          }, "Build a self-contained interactive HTML prototype of the core invoice import and reminder flow.");
+          const html = prototype.prototype?.html;
+          if (typeof html !== "string" || !/<!doctype html>/i.test(html) || !/<script/i.test(html))
+            throw Error("Prototype missing self-contained interactive HTML");
+          console.log("PROTOTYPE OK", html.length, "HTML characters");
+          NODE
