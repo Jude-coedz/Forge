@@ -4,6 +4,7 @@ import type {
   ProductModel,
   PrototypeDoc,
   SpecDoc,
+  StressTestReport,
   ThesisOption,
 } from "../types";
 import { RemoteReasoningProvider } from "./remote";
@@ -14,6 +15,7 @@ export type ForgeTurnResult = {
   productName?: string;
   productModel?: ProductModel;
   research?: MarketResearch | null;
+  stressTest?: StressTestReport | null;
   theses?: ThesisOption[];
   spec?: SpecDoc | null;
   prototype?: PrototypeDoc | null;
@@ -134,6 +136,38 @@ function cleanResearch(value: unknown): MarketResearch | undefined {
   };
 }
 
+function cleanStressTest(value: unknown): StressTestReport | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Partial<StressTestReport>;
+  const experiment = raw.firstExperiment;
+  if (!Array.isArray(raw.findings) || raw.findings.length === 0 || !experiment) return undefined;
+  return {
+    createdAt: Date.now(),
+    thesis: String(raw.thesis || ""),
+    strongestCounterargument: String(raw.strongestCounterargument || ""),
+    recommendation: raw.recommendation === "reframe" || raw.recommendation === "proceed-to-test"
+      ? raw.recommendation : "investigate",
+    recommendationReason: String(raw.recommendationReason || ""),
+    findings: raw.findings.slice(0, 4).map((x, index) => ({
+      id: String(x.id || `risk-${index}`),
+      risk: x.risk === "usability" || x.risk === "feasibility" || x.risk === "viability" ? x.risk : "value",
+      title: String(x.title || "Untested assumption"),
+      assumption: String(x.assumption || ""),
+      whyItMatters: String(x.whyItMatters || ""),
+      falsification: String(x.falsification || ""),
+      fastestTest: String(x.fastestTest || ""),
+      evidenceState: x.evidenceState === "partial" || x.evidenceState === "contested"
+        ? x.evidenceState : "missing",
+    })),
+    firstExperiment: {
+      hypothesis: String(experiment.hypothesis || ""),
+      method: String(experiment.method || ""),
+      successSignal: String(experiment.successSignal || ""),
+      stopSignal: String(experiment.stopSignal || ""),
+    },
+  };
+}
+
 function cleanPrototype(value: unknown): PrototypeDoc | undefined {
   if (!value || typeof value !== "object") return undefined;
   const raw = value as Record<string, unknown>;
@@ -163,6 +197,7 @@ export async function runForgeTurn(
     productName: typeof raw.productName === "string" ? raw.productName.trim() : undefined,
     productModel: cleanProductModel(raw.productModel),
     research: cleanResearch(raw.research),
+    stressTest: cleanStressTest(raw.stressTest),
     theses: cleanTheses(raw.theses),
     spec: raw.spec && typeof raw.spec === "object" ? (raw.spec as SpecDoc) : raw.spec === null ? null : undefined,
     prototype: cleanPrototype(raw.prototype),
