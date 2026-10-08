@@ -1,0 +1,51 @@
+name: Forge production AI smoke
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/smoke-production.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Verify production health and Gemini idea analysis
+        run: |
+          node --input-type=module <<'NODE'
+          const base = "https://forge-three-wine-59.vercel.app";
+          async function request(path, options = {}, ms = 80000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), ms);
+            const start = Date.now();
+            try {
+              const response = await fetch(base + path, { ...options, signal: controller.signal });
+              const text = await response.text();
+              console.log(path, "status", response.status, "elapsedMs", Date.now() - start);
+              const data = JSON.parse(text);
+              if (data.error) console.log("error code", data.code || "unspecified", "message", String(data.error).slice(0,300));
+              return { status: response.status, data };
+            } finally { clearTimeout(timer); }
+          }
+          const health = await request("/api/forge/turn", {}, 10000);
+          console.log("runtime:", health.data.runtime, "Gemini configured:", health.data.configured);
+          if (health.status !== 200 || health.data.runtime !== "edge-streaming") throw Error("Production Edge API unavailable");
+          if (!health.data.configured) throw Error("PRODUCTION_KEY_MISSING: configure Gemini_key in Vercel Production");
+
+          const text = "Freelancers chase overdue invoices manually; would an automated reminder product help if importing their invoice data is annoying?";
+          const idea = await request("/api/forge/turn", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mode: "chat", message: text,
+              conversation: { productModel: {}, recentMessages: [{ role: "user", text }] },
+            }),
+          });
+          if (idea.data.error) throw Error("PRODUCTION_GEMINI_FAILED: " + String(idea.data.code || idea.data.error).slice(0,180));
+          if (!idea.data.productModel?.summary) throw Error("PRODUCTION_MODEL_EMPTY: no hypothesis returned");
+          console.log("SUCCESS: Forge production Gemini produced a structured product hypothesis.");
+          NODE
