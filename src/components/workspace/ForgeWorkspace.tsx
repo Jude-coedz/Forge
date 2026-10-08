@@ -75,12 +75,12 @@ export function ForgeWorkspace() {
               return (
                 <div key={message.id} className={isUser ? "flex justify-end" : ""}>
                   {isUser ? (
-                    <div className="max-w-[88%] rounded-[18px] bg-inset px-4 py-3.5">
+                    <div className="max-w-[88%] rounded-lg bg-inset px-4 py-3.5">
                       <p className="whitespace-pre-wrap text-[16px] leading-7 text-ink-2">{message.text}</p>
                     </div>
                   ) : (
                     <div className="forge-message-enter max-w-[94%]">
-                      <p className="mb-2 text-[12px] font-medium text-spark">Forge</p>
+                      <p className="mb-2 forge-eyebrow text-ink-4">Forge</p>
                       <p className="whitespace-pre-wrap text-[16px] leading-7 text-ink-2">{message.text}</p>
                     </div>
                   )}
@@ -250,8 +250,8 @@ function ModelArtifact({ conv }: { conv: Conversation }) {
   return (
     <div className="forge-content-enter mx-auto w-full max-w-[940px] px-7 py-9 xl:px-12 xl:py-12">
       <div className="max-w-[760px]">
-        <p className="text-[13px] font-medium text-ink-4">Current hypothesis</p>
-        <h1 className="mt-2 text-[36px] font-[480] leading-[1.12] tracking-[-0.04em] text-ink">
+        <p className="forge-eyebrow text-ink-4">Current hypothesis</p>
+        <h1 className="mt-2 forge-display text-[36px] leading-[1.12] text-ink">
           {conv.productName || conv.title || "Untitled idea"}
         </h1>
 
@@ -482,7 +482,7 @@ function ResearchArtifact({ conv }: { conv: Conversation }) {
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div className="max-w-[740px]">
           <p className="text-[13px] font-medium text-ink-4">Market check</p>
-          <h1 className="mt-2 text-[34px] font-[480] leading-[1.15] tracking-[-0.035em] text-ink">
+          <h1 className="mt-2 forge-display text-[34px] leading-[1.15] tracking-[-0.035em] text-ink">
             What changes after looking outside the idea
           </h1>
           <p className="mt-4 text-[17px] leading-8 text-ink-2">{research.summary}</p>
@@ -638,7 +638,7 @@ function DirectionRow({
       onClick={onSelect}
       className={
         "grid w-full gap-5 border-b border-line px-1 py-6 text-left transition-colors last:border-b-0 md:grid-cols-[44px_1.25fr_1fr_1fr] md:items-start " +
-        (selected ? "bg-spark-soft/45" : "hover:bg-inset/45")
+        (selected ? "bg-inset/70" : "hover:bg-inset/45")
       }
     >
       <span className={
