@@ -117,9 +117,14 @@ export function DecisionWorkbench() {
         </nav>
 
         {view === "hypothesis" && <HypothesisView conv={conv} onStress={() => { setView("stress"); f.stressTestIdea(); }} onResearch={() => f.researchIdea()} />}
-        {view === "stress" && <StressView conv={conv} onBack={() => setView("hypothesis")} onDirections={() => { setView("directions"); f.advanceToDirections(); }} />}
+        {view === "stress" && <StressView
+          conv={conv}
+          onBack={() => setView("hypothesis")}
+          onDirections={() => { setView("directions"); f.advanceToDirections(); }}
+          onPrototype={() => { setView("prototype"); f.prototypeCurrentIdea(); }}
+        />}
         {view === "directions" && <DirectionsView conv={conv} onBack={() => setView("stress")} onBuild={() => { setView("prototype"); f.buildChosenPrototype(); }} />}
-        {view === "prototype" && <PrototypeView conv={conv} onBack={() => setView("directions")} />}
+        {view === "prototype" && <PrototypeView conv={conv} onBack={() => setView(conv.theses.length ? "directions" : "stress")} />}
       </div>
     </main>
   );
@@ -279,8 +284,8 @@ function EditableRow({ label, value, onChange }: { label: string; value: string;
 }
 
 function StressView({
-  conv, onBack, onDirections,
-}: { conv: Conversation; onBack: () => void; onDirections: () => void }) {
+  conv, onBack, onDirections, onPrototype,
+}: { conv: Conversation; onBack: () => void; onDirections: () => void; onPrototype: () => void }) {
   const f = useForge();
   const report = conv.stressTest;
   const [activeIndex, setActiveIndex] = useState(0);
@@ -346,8 +351,15 @@ function StressView({
             {report.recommendation === "reframe" ? "Reframe the problem" : report.recommendation === "investigate" ? "Investigate before committing" : "Proceed to a real test"}
           </p>
           <p className="mt-3 text-[14px] leading-7 text-ink-3">{report.recommendationReason}</p>
-          <Button className="mt-7" onClick={onDirections} disabled={f.generating}>Compare product directions <ArrowRight className="size-4" /></Button>
-          <button type="button" onClick={onBack} className="mt-4 flex items-center gap-2 text-[13px] text-ink-4 hover:text-white"><ArrowLeft className="size-4" /> Rework the idea</button>
+          <Button className="mt-7" onClick={onPrototype} disabled={f.generating}>
+            Build a prototype of this test <ArrowRight className="size-4" />
+          </Button>
+          <button type="button" onClick={onDirections} disabled={f.generating} className="mt-4 flex items-center gap-2 text-[13px] text-ink-2 transition hover:text-white disabled:opacity-40">
+            Explore other product directions <ChevronRight className="size-4" />
+          </button>
+          <button type="button" onClick={onBack} className="mt-4 flex items-center gap-2 text-[13px] text-ink-4 hover:text-white">
+            <ArrowLeft className="size-4" /> Rework the idea
+          </button>
         </aside>
       </div>
     </div>
@@ -441,7 +453,9 @@ function PrototypeView({ conv, onBack }: { conv: Conversation; onBack: () => voi
         </div>
         <Button variant="secondary" onClick={f.buildPrototype} disabled={f.generating}><RefreshCw className="size-4" /> Regenerate</Button>
       </div>
-      <button type="button" onClick={onBack} className="mt-6 inline-flex items-center gap-2 text-[13px] text-ink-4 hover:text-white"><ArrowLeft className="size-4" /> Directions</button>
+      <button type="button" onClick={onBack} className="mt-6 inline-flex items-center gap-2 text-[13px] text-ink-4 hover:text-white">
+        <ArrowLeft className="size-4" /> {conv.theses.length ? "Directions" : "Stress test"}
+      </button>
     </div>
   );
 }
