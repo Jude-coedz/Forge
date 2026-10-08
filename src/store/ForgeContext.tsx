@@ -18,6 +18,7 @@ import type {
   ProjectStage,
   PrototypeDoc,
   SpecDoc,
+  StressTestReport,
   Theme,
   ThesisId,
   Toast,
@@ -52,6 +53,7 @@ function blankConversation(): Conversation {
     sources: [],
     productModel: blankProductModel(),
     research: null,
+    stressTest: null,
     theses: [],
     selectedThesis: "A",
     thesisLocked: false,
@@ -75,6 +77,21 @@ function normalizeResearch(value: unknown): MarketResearch | null {
     unresolved: Array.isArray(raw.unresolved) ? raw.unresolved.filter((x): x is string => typeof x === "string") : [],
     sources: Array.isArray(raw.sources) ? raw.sources.filter((item) => Boolean(item && typeof item.url === "string")) : [],
     researchedAt: typeof raw.researchedAt === "number" ? raw.researchedAt : Date.now(),
+  };
+}
+
+function normalizeStressTest(value: unknown): StressTestReport | null {
+  if (!value || typeof value !== "object") return null;
+  const report = value as Partial<StressTestReport>;
+  if (!Array.isArray(report.findings) || !report.firstExperiment) return null;
+  return {
+    createdAt: typeof report.createdAt === "number" ? report.createdAt : Date.now(),
+    thesis: typeof report.thesis === "string" ? report.thesis : "",
+    strongestCounterargument: typeof report.strongestCounterargument === "string" ? report.strongestCounterargument : "",
+    recommendation: report.recommendation === "reframe" || report.recommendation === "proceed-to-test" ? report.recommendation : "investigate",
+    recommendationReason: typeof report.recommendationReason === "string" ? report.recommendationReason : "",
+    findings: report.findings.filter((item) => item && typeof item.title === "string").slice(0, 4),
+    firstExperiment: report.firstExperiment,
   };
 }
 
@@ -125,6 +142,7 @@ function normalizeConversation(value: unknown): Conversation | null {
   };
   const theses = Array.isArray(raw.theses) ? raw.theses as Conversation["theses"] : [];
   const research = normalizeResearch(raw.research);
+  const stressTest = normalizeStressTest(raw.stressTest);
   const spec = normalizeSpec(raw.spec);
   const prototype = normalizePrototype(raw.prototype);
   const messages = Array.isArray(raw.messages)
@@ -146,6 +164,7 @@ function normalizeConversation(value: unknown): Conversation | null {
     sources: Array.isArray(raw.sources) ? raw.sources.filter((x): x is string => typeof x === "string") : [],
     productModel,
     research,
+    stressTest,
     theses,
     selectedThesis: raw.selectedThesis === "B" || raw.selectedThesis === "C" || raw.selectedThesis === "CUSTOM" ? raw.selectedThesis : "A",
     thesisLocked: raw.thesisLocked === true,
@@ -157,6 +176,7 @@ function normalizeConversation(value: unknown): Conversation | null {
   const hasWork = conversation.messages.length > 0
     || Boolean(conversation.productModel.summary || conversation.productModel.opportunity)
     || Boolean(conversation.research)
+    || Boolean(conversation.stressTest)
     || Boolean(conversation.spec)
     || Boolean(conversation.prototype)
     || conversation.title !== "New project";
@@ -177,7 +197,8 @@ function loadConversations(): Conversation[] {
 }
 
 function frameChanged(before: ProductModel, after: ProductModel) {
-  return before.primaryUser !== after.primaryUser
+  return before.summary !== after.summary
+    || before.primaryUser !== after.primaryUser
     || before.opportunity !== after.opportunity
     || before.currentWorkaround !== after.currentWorkaround
     || before.desiredOutcome !== after.desiredOutcome;
@@ -205,7 +226,9 @@ type ForgeContextValue = {
   deleteConversation: (id: string) => void;
   sendChat: (text?: string) => void;
   researchIdea: () => void;
+  stressTestIdea: () => void;
   advanceToDirections: () => void;
+  buildChosenPrototype: () => void;
   selectThesis: (id: ThesisId) => void;
   lockThesis: () => void;
   buildPrototype: () => void;
@@ -305,6 +328,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       ...conversation,
       productModel: nextModel,
       research: changed ? null : conversation.research,
+      stressTest: changed ? null : conversation.stressTest,
       theses: changed ? [] : conversation.theses,
       thesisLocked: changed ? false : conversation.thesisLocked,
       spec: changed ? null : conversation.spec,
@@ -395,6 +419,7 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
         title: autoTitle ? (productName || working.title) : working.title,
         productModel: nextModel,
         research: didFrameChange ? null : working.research,
+        stressTest: didFrameChange ? null : working.stressTest,
         stage: shouldInvalidate ? "challenge" : working.stage,
         theses: shouldInvalidate || working.stage === "frame" || working.stage === "challenge" ? [] : working.theses,
         thesisLocked: shouldInvalidate || working.stage === "frame" || working.stage === "challenge" ? false : working.thesisLocked,
@@ -445,6 +470,11 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       setConversations((list) => list.map((item) => item.id === conv.id ? {
         ...item,
         research: result.research ?? null,
+        stressTest: null,
+        theses: [],
+        thesisLocked: false,
+        spec: null,
+        prototype: null,
         updatedAt: Date.now(),
       } : item));
       appendAssistant(conv.id, result.reply);
@@ -461,6 +491,42 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
       );
     }
   }, [appendAssistant, conv, failAction, generating, toast]);
+
+  const stressTestIdea = useCallback(async () => {
+    if (!conv || generating) return;
+    if (!conv.productModel.summary && !conv.productModel.opportunity) {
+      toast({ title: "Start with the idea first", body: "Forge needs an idea or problem to stress-test.", tone: "warn" });
+      return;
+    }
+    setGenerating(true);
+    try {
+      const result = await runForgeTurn(
+        conv,
+        "Find the assumptions most likely to kill this specific product. Give me a falsifiable experiment before I build it.",
+        "stress-test",
+      );
+      const stressTest = result.stressTest;
+      if (!stressTest || stressTest.findings.length < 3) throw new Error("Incomplete stress test");
+      setConversations((list) => list.map((item) => item.id === conv.id ? {
+        ...item,
+        stressTest,
+        theses: [],
+        thesisLocked: false,
+        spec: null,
+        prototype: null,
+        stage: "challenge",
+        updatedAt: Date.now(),
+      } : item));
+      setGenerating(false);
+    } catch (error) {
+      setGenerating(false);
+      toast({
+        title: "The stress test didn't finish",
+        body: error instanceof Error ? error.message.slice(0, 180) : "Your idea remains saved. Retry the stress test.",
+        tone: "danger",
+      });
+    }
+  }, [conv, generating, toast]);
 
   const advanceToDirections = useCallback(async () => {
     if (!conv || generating) return;
@@ -592,6 +658,64 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     }
   }, [appendAssistant, conv, generating, patchActive, toast]);
 
+  const buildChosenPrototype = useCallback(async () => {
+    if (!conv || generating) return;
+    const thesis = conv.theses.find((option) => option.id === conv.selectedThesis);
+    if (!thesis) return;
+
+    setGenerating(true);
+    try {
+      let spec = conv.spec;
+      if (!spec || !conv.thesisLocked) {
+        const brief = await runForgeTurn(
+          conv,
+          `I choose ${thesis.title}. Generate a lean Build Brief that focuses on testing the riskiest mechanism.`,
+          "lock-thesis",
+        );
+        if (!brief.spec) throw new Error("The build brief was incomplete.");
+        spec = brief.spec;
+        setConversations((list) => list.map((item) => item.id === conv.id ? {
+          ...item,
+          spec,
+          thesisLocked: true,
+          stage: "brief",
+          updatedAt: Date.now(),
+        } : item));
+      }
+
+      const chosen = {
+        ...conv,
+        spec,
+        thesisLocked: true,
+        stage: "brief" as ProjectStage,
+      };
+      const built = await runForgeTurn(
+        chosen,
+        "Prototype the chosen product's riskiest interaction. Make it interactive and self-contained, not a generic dashboard.",
+        "prototype",
+      );
+      if (!built.prototype) throw new Error("The prototype was incomplete.");
+      const prototype = built.prototype;
+      setConversations((list) => list.map((item) => item.id === conv.id ? {
+        ...item,
+        spec,
+        thesisLocked: true,
+        prototype,
+        stage: "prototype",
+        updatedAt: Date.now(),
+      } : item));
+      toast({ title: "Prototype ready", body: "Use it to test the chosen product mechanism, not to claim market validation.", tone: "success" });
+    } catch (error) {
+      toast({
+        title: "Prototype generation stopped",
+        body: error instanceof Error ? error.message.slice(0, 180) : "Your project and any completed brief were saved.",
+        tone: "danger",
+      });
+    } finally {
+      setGenerating(false);
+    }
+  }, [conv, generating, toast]);
+
   const copySpec = useCallback(() => {
     if (!conv?.spec) return;
     void navigator.clipboard.writeText(specToMarkdown(conv.spec));
@@ -634,7 +758,9 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     deleteConversation,
     sendChat,
     researchIdea,
+    stressTestIdea,
     advanceToDirections,
+    buildChosenPrototype,
     selectThesis,
     lockThesis,
     buildPrototype,
@@ -661,7 +787,9 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
     deleteConversation,
     sendChat,
     researchIdea,
+    stressTestIdea,
     advanceToDirections,
+    buildChosenPrototype,
     selectThesis,
     lockThesis,
     buildPrototype,
