@@ -30,7 +30,7 @@ The user may be a PM, solo builder, designer, or founder. They should not have t
 
 ## New user-visible mental model
 
-**One thought → one hypothesis → one adversarial stress test → one informed product choice → one working prototype.**
+**One thought → one hypothesis → one adversarial stress test → one real-world experiment and prototype.** Alternative product directions are optional, not a prerequisite.
 
 Internally this includes structured state and generated artifacts, but the person sees a purpose-built workbench.
 
@@ -52,10 +52,10 @@ Internally this includes structured state and generated artifacts, but the perso
 - Recommendation is provisional: investigate, reframe or proceed to a real test.
 - The outcome of this screen is a better decision, not the claim that the idea is validated.
 
-### Directions
+### Optional directions
 - Three mechanisms, not three feature lists.
 - User selection is explicit.
-- One action: generate brief + interactive prototype for selected mechanism.
+- This branch is optional for someone who wants to consider alternatives before prototyping. The direct stress-test-to-prototype path stays primary.
 
 ### Prototype
 - Sandboxed local-only working interaction, not a production deployment or fake external integration.
@@ -81,8 +81,8 @@ Internally this includes structured state and generated artifacts, but the perso
 3. A response creates a working hypothesis; if the API fails, input remains visible.
 4. "Stress-test" produces specific ranked risks and an experiment; a failure shows Retry, never a blank panel.
 5. Inspecting different risks changes the detail pane and preserves selected state while browsing.
-6. "Directions" generates exactly three options; a backend failure offers Retry without losing the stress test.
-7. Selecting one option and choosing Build creates a brief then a prototype, without an intervening wizard page.
+6. The user can generate a prototype directly from the stress test and its first experiment, without opening Directions.
+7. If they choose optional Directions, exactly three options appear; selecting one builds the brief and prototype with a recoverable retry.
 8. Re-entry by project selection and browser refresh returns to useful work.
 9. Sidebar collapse and expand work with pointer and keyboard.
 10. On mobile, no critical CTA disappears or splits the screen into cramped chat/canvas panels.
