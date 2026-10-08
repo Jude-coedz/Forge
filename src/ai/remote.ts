@@ -66,6 +66,11 @@ export class RemoteReasoningProvider implements ForgeReasoningProvider {
     if (!payload || typeof payload !== "object") {
       throw new AIProviderError("Forge received an invalid response. Your input is saved.");
     }
+    // Edge streaming starts with HTTP 200 to avoid gateway idle timeouts.
+    // The final JSON may still carry a backend error.
+    if (typeof payload.error === "string") {
+      throw new AIProviderError(payload.error);
+    }
     return payload;
   }
 }
