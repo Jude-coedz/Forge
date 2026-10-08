@@ -13,7 +13,7 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Verify production health and Gemini idea analysis
         run: |
@@ -49,4 +49,23 @@ jobs:
           if (idea.data.error) throw Error("PRODUCTION_GEMINI_FAILED: " + String(idea.data.code || idea.data.error).slice(0,180));
           if (!idea.data.productModel?.summary) throw Error("PRODUCTION_MODEL_EMPTY: no hypothesis returned");
           console.log("SUCCESS: Forge production Gemini produced a structured product hypothesis.");
+          const stress = await request("/api/forge/turn", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mode: "stress-test",
+              message: "Find assumptions that could make this product fail. Return an experiment that tests the highest-risk one.",
+              conversation: {
+                productModel: idea.data.productModel,
+                productName: idea.data.productName,
+                recentMessages: [{ role: "user", text }],
+                research: null,
+              },
+            }),
+          }, 105000);
+          if (stress.data.error) throw Error("STRESS_TEST_FAILED: " + String(stress.data.code || stress.data.error).slice(0,180));
+          if (!stress.data.stressTest?.findings?.length || !stress.data.stressTest?.firstExperiment)
+            throw Error("STRESS_TEST_INCOMPLETE: no actionable risk analysis");
+          console.log("SUCCESS: Forge production Gemini returned",
+            stress.data.stressTest.findings.length, "falsifiable risks and an experiment.");
           NODE
