@@ -419,8 +419,25 @@ export function ForgeProvider({ children }: { children: ReactNode }) {
 
     try {
       const result = await runForgeTurn(working, content, "chat");
-      const nextModel = result.productModel ?? working.productModel;
-      const didFrameChange = frameChanged(working.productModel, nextModel);
+      const generatedModel = result.productModel;
+      // Fast Gemini framing returns just five core fields. Preserve prior evidence
+      // and decisions unless those fields materially changed.
+      const candidateModel = generatedModel ? {
+        ...working.productModel,
+        ...generatedModel,
+        evidence: working.productModel.evidence,
+        assumptions: working.productModel.assumptions,
+        decisions: working.productModel.decisions,
+        validationTasks: working.productModel.validationTasks,
+      } : working.productModel;
+      const didFrameChange = frameChanged(working.productModel, candidateModel);
+      const nextModel = didFrameChange ? {
+        ...candidateModel,
+        evidence: [],
+        assumptions: [],
+        decisions: [],
+        validationTasks: [],
+      } : candidateModel;
       const productName = result.productName || working.productName;
       const autoTitle = working.title === "New project";
       const shouldInvalidate = didFrameChange && (
