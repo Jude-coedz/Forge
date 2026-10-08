@@ -1,191 +1,156 @@
 import { useState } from "react";
-import { Check, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react";
-import { cn } from "../../lib/cn";
+import {
+  Check, FileText, MoreHorizontal,
+  PanelLeftClose, PanelLeftOpen, Pencil, Plus, Trash2, X,
+} from "lucide-react";
 import { useForge } from "../../store/ForgeContext";
 import { ForgeMark } from "../ui/primitives";
-import type { Conversation } from "../../types";
 
 export function Sidebar() {
   const f = useForge();
   const [menuId, setMenuId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftTitle, setDraftTitle] = useState("");
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
+  const [draft, setDraft] = useState("");
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const collapsed = f.sidebarCollapsed;
   const projects = [...f.conversations].sort((a, b) => b.updatedAt - a.updatedAt);
 
   const beginRename = (id: string, title: string) => {
     setEditingId(id);
-    setDraftTitle(title);
+    setDraft(title);
     setMenuId(null);
   };
 
   const saveRename = () => {
-    if (editingId && draftTitle.trim()) f.renameConversation(editingId, draftTitle);
+    if (editingId && draft.trim()) f.renameConversation(editingId, draft);
     setEditingId(null);
-    setDraftTitle("");
+    setDraft("");
   };
 
   return (
     <>
       {f.sidebarOpen && (
         <button
-          className="fixed inset-0 z-30 bg-black/20 backdrop-blur-[2px] md:hidden"
+          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px] md:hidden"
+          type="button"
           aria-label="Close projects"
           onClick={() => f.setSidebarOpen(false)}
         />
       )}
 
       <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col border-r border-line bg-canvas transition-transform duration-200 md:static md:z-0 md:translate-x-0",
-          f.sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-        )}
+        aria-label="Projects"
+        className={
+          "fixed inset-y-0 left-0 z-40 flex w-[270px] shrink-0 flex-col overflow-visible border-r border-line bg-canvas transition-[width,transform] duration-200 md:static md:z-0 md:translate-x-0 " +
+          (f.sidebarOpen ? "translate-x-0 " : "-translate-x-full ") +
+          (collapsed ? "md:w-[70px]" : "md:w-[250px]")
+        }
       >
-        <div className="flex h-14 items-center px-4">
+        <header className={"flex h-[58px] shrink-0 items-center " + (collapsed ? "justify-between px-3.5 md:justify-center md:px-2" : "justify-between px-4")}>
           <button
             type="button"
             onClick={f.newProject}
-            className="flex items-center gap-2.5 rounded-lg text-left"
             aria-label="Forge home"
+            title="Forge home"
+            className="flex items-center gap-3 rounded-lg text-left focus-visible:outline-offset-4"
           >
-            <ForgeMark className="size-7" />
-            <span className="text-[15px] font-normal tracking-[-0.02em] text-ink">Forge</span>
+            <ForgeMark className="size-8 shrink-0" />
+            <span className={"text-[16px] font-normal tracking-[-0.02em] text-white " + (collapsed ? "md:hidden" : "")}>Forge</span>
           </button>
-        </div>
-
-        <div className="px-2.5 pt-2">
           <button
             type="button"
-            onClick={() => {
-              f.newProject();
-              setMenuId(null);
-            }}
-            className="flex h-9 w-full items-center gap-2 rounded-full px-3 text-[14px] font-normal text-ink-2 transition hover:bg-inset hover:text-ink"
+            className="grid size-8 place-items-center rounded-full text-ink-3 hover:bg-inset hover:text-white md:hidden"
+            onClick={() => f.setSidebarOpen(false)}
+            aria-label="Close sidebar"
           >
-            <Plus className="size-4" />
-            New idea
+            <X className="size-4" />
+          </button>
+        </header>
+
+        <div className="px-2 pt-4">
+          <button
+            type="button"
+            onClick={() => { f.newProject(); setMenuId(null); }}
+            title="New idea"
+            aria-label="New idea"
+            className={"flex h-10 w-full items-center rounded-full border border-line-strong text-[13px] text-ink-2 transition hover:border-ink-3 hover:bg-inset hover:text-white " +
+              (collapsed ? "justify-center px-2" : "gap-3 px-4")}
+          >
+            <Plus className="size-4 shrink-0" />
+            <span className={collapsed ? "md:hidden" : ""}>New idea</span>
           </button>
         </div>
 
-        <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-2.5 scrollbar-thin">
-          <p className="px-2.5 pb-2 text-[12px] font-medium text-ink-4">Projects</p>
-
+        <div className="mt-8 min-h-0 flex-1 overflow-y-auto px-2 scrollbar-thin">
+          <p className={"forge-eyebrow px-3 pb-3 text-ink-4 " + (collapsed ? "md:sr-only" : "")}>Projects</p>
           {projects.length === 0 && (
-            <p className="px-2.5 text-[12px] leading-5 text-ink-4">
-              Your product thinking will stay here as you work.
+            <p className={"px-3 text-[12px] leading-6 text-ink-4 " + (collapsed ? "md:hidden" : "")}>
+              The ideas you've tested will appear here.
             </p>
           )}
 
-          <div className="space-y-0.5">
+          <div className="space-y-1">
             {projects.map((project) => {
               const active = f.activeId === project.id;
               const editing = editingId === project.id;
-
               return (
                 <div key={project.id} className="group relative">
                   <div
-                    className={cn(
-                      "flex min-h-[40px] w-full items-center gap-2 rounded-lg px-3 text-left transition",
-                      active ? "bg-inset text-ink" : "text-ink-3 hover:bg-inset/70 hover:text-ink",
-                    )}
+                    className={
+                      "flex min-h-[42px] items-center gap-2 rounded-lg transition-colors " +
+                      (active ? "bg-inset text-white" : "text-ink-3 hover:bg-inset/70 hover:text-white")
+                    }
                   >
-                    <span className={"size-1.5 shrink-0 rounded-full " + statusTone(project)} />
-
                     {editing ? (
-                      <form
-                        className="flex min-w-0 flex-1 items-center gap-1"
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          saveRename();
-                        }}
-                      >
+                      <form className="flex min-w-0 flex-1 items-center gap-1 px-2" onSubmit={(event) => { event.preventDefault(); saveRename(); }}>
                         <input
                           autoFocus
-                          value={draftTitle}
-                          onChange={(event) => setDraftTitle(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Escape") setEditingId(null);
-                          }}
-                          className="min-w-0 flex-1 rounded-md border border-line-strong bg-raised px-2 py-1 text-[12px] outline-none"
+                          value={draft}
+                          onChange={(event) => setDraft(event.target.value)}
+                          onKeyDown={(event) => { if (event.key === "Escape") setEditingId(null); }}
+                          className="min-w-0 flex-1 rounded-lg border border-line-strong bg-raised px-2 py-1 text-[13px]"
                         />
-                        <button type="submit" className="grid size-7 place-items-center rounded-md hover:bg-raised" aria-label="Save name">
-                          <Check className="size-3.5" />
-                        </button>
-                        <button type="button" onClick={() => setEditingId(null)} className="grid size-7 place-items-center rounded-md hover:bg-raised" aria-label="Cancel rename">
-                          <X className="size-3.5" />
-                        </button>
+                        <button type="submit" aria-label="Save name"><Check className="size-4" /></button>
+                        <button type="button" aria-label="Cancel" onClick={() => setEditingId(null)}><X className="size-4" /></button>
                       </form>
                     ) : (
-                      <button
-                        type="button"
-                        className="min-w-0 flex-1 truncate text-left text-[14px] font-medium"
-                        onClick={() => {
-                          f.openConversation(project.id);
-                          setMenuId(null);
-                        }}
-                        title={project.title}
-                      >
-                        {project.title}
-                      </button>
-                    )}
-
-                    {!editing && (
-                      <button
-                        type="button"
-                        onClick={() => setMenuId(menuId === project.id ? null : project.id)}
-                        className="grid size-7 shrink-0 place-items-center rounded-md text-ink-4 opacity-0 transition hover:bg-raised hover:text-ink group-hover:opacity-100 focus:opacity-100"
-                        aria-label={"Project options for " + project.title}
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          title={project.title}
+                          aria-label={"Open " + project.title}
+                          onClick={() => { f.openConversation(project.id); setMenuId(null); }}
+                          className={"flex min-w-0 flex-1 items-center gap-3 py-2 text-left text-[13px] " + (collapsed ? "justify-center px-2" : "px-3")}
+                        >
+                          <FileText className={"size-4 shrink-0 " + (active ? "text-white" : "text-ink-4")} />
+                          <span className={"truncate " + (collapsed ? "md:hidden" : "")}>{project.title}</span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={"Options for " + project.title}
+                          onClick={() => setMenuId(menuId === project.id ? null : project.id)}
+                          className={"mr-1 grid size-7 shrink-0 place-items-center rounded-lg text-ink-4 opacity-0 transition hover:bg-raised hover:text-white group-hover:opacity-100 focus:opacity-100 " + (collapsed ? "md:hidden" : "")}
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </button>
+                      </>
                     )}
                   </div>
 
                   {menuId === project.id && !editing && (
-                    <div className="absolute right-1 top-10 z-50 w-44 rounded-xl border border-line bg-raised p-1.5 shadow-[var(--shadow-toast)]">
-                      {confirmDeleteId === project.id ? (
+                    <div className="absolute right-1 top-11 z-50 w-52 rounded-lg border border-line-strong bg-[#202126] p-1.5 shadow-[0_18px_44px_rgba(0,0,0,.4)]">
+                      {confirmId === project.id ? (
                         <div className="p-2">
-                          <p className="text-[12px] text-ink-3">Delete this project?</p>
-                          <div className="mt-2 flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="flex-1 rounded-md border border-line px-2 py-1.5 text-[11px] text-ink-3 hover:bg-inset"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                f.deleteConversation(project.id);
-                                setMenuId(null);
-                                setConfirmDeleteId(null);
-                              }}
-                              className="flex-1 rounded-md bg-scorch px-2 py-1.5 text-[11px] text-white"
-                            >
-                              Delete
-                            </button>
+                          <p className="text-[13px] text-ink-2">Delete this idea and all saved work?</p>
+                          <div className="mt-3 flex gap-2">
+                            <button type="button" onClick={() => setConfirmId(null)} className="rounded-full border border-line-strong px-3 py-1.5 text-[12px] text-ink-2">Cancel</button>
+                            <button type="button" onClick={() => { f.deleteConversation(project.id); setMenuId(null); setConfirmId(null); }} className="rounded-full bg-white px-3 py-1.5 text-[12px] text-black">Delete</button>
                           </div>
                         </div>
                       ) : (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => beginRename(project.id, project.title)}
-                            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-[12px] text-ink-2 hover:bg-inset"
-                          >
-                            <Pencil className="size-3.5" />
-                            Rename
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteId(project.id)}
-                            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-[12px] text-scorch hover:bg-scorch-soft"
-                          >
-                            <Trash2 className="size-3.5" />
-                            Delete
-                          </button>
+                          <button type="button" onClick={() => beginRename(project.id, project.title)} className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-[13px] text-ink-2 hover:bg-inset"><Pencil className="size-3.5" /> Rename</button>
+                          <button type="button" onClick={() => setConfirmId(project.id)} className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-[13px] text-scorch hover:bg-inset"><Trash2 className="size-3.5" /> Delete</button>
                         </>
                       )}
                     </div>
@@ -196,14 +161,20 @@ export function Sidebar() {
           </div>
         </div>
 
+        <div className="shrink-0 border-t border-line p-2">
+          <button
+            type="button"
+            onClick={() => f.setSidebarCollapsed(!collapsed)}
+            className={"hidden h-10 w-full items-center rounded-full text-[13px] text-ink-3 transition hover:bg-inset hover:text-white md:flex " +
+              (collapsed ? "justify-center" : "gap-3 px-3")}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+            {!collapsed && <span>Collapse sidebar</span>}
+          </button>
+        </div>
       </aside>
     </>
   );
-}
-
-function statusTone(project: Conversation) {
-  if (project.prototype) return "bg-temper";
-  if (project.spec) return "bg-spark";
-  if (project.theses.length > 0) return "bg-molten";
-  return "bg-ink-4";
 }

@@ -254,3 +254,24 @@ input::placeholder {
 .forge-pill {border-radius:9999px;}
 .forge-surface {background:#191919;border:1px solid #212327;border-radius:8px;box-shadow:none;}
 .forge-content-enter, .forge-message-enter {animation-duration:240ms;}
+
+/* Decision workbench: transitions explain which artifact is being inspected. */
+.forge-panel-enter { animation: forge-panel 330ms cubic-bezier(.2,.7,.2,1) both; }
+.forge-detail-enter { animation: forge-detail 230ms cubic-bezier(.2,.7,.2,1) both; }
+.forge-process-pulse { animation: forge-progress 1.2s ease-in-out infinite; }
+.forge-process-track { border-radius:2px; }
+@keyframes forge-panel {
+  from { opacity:0; transform:translateY(11px); }
+  to { opacity:1; transform:translateY(0); }
+}
+@keyframes forge-detail {
+  from { opacity:0; transform:translateY(5px); }
+  to { opacity:1; transform:translateY(0); }
+}
+@keyframes forge-progress {
+  from { transform:translateX(-110%); }
+  to { transform:translateX(310%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .forge-panel-enter, .forge-detail-enter, .forge-process-pulse { animation:none !important; }
+}

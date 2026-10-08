@@ -1,24 +1,13 @@
-import { useEffect } from "react";
 import { Menu } from "lucide-react";
 import { useForge } from "../../store/ForgeContext";
 import { Welcome } from "../chat/Welcome";
-import { ForgeWorkspace } from "../workspace/ForgeWorkspace";
+import { DecisionWorkbench } from "../workbench/DecisionWorkbench";
 import { Button } from "../ui/primitives";
 import { Sidebar } from "./Sidebar";
 
 export function AppShell() {
   const f = useForge();
 
-  useEffect(() => {
-    f.newProject();
-
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) f.newProject();
-    };
-
-    window.addEventListener("pageshow", handlePageShow);
-    return () => window.removeEventListener("pageshow", handlePageShow);
-  }, [f.newProject]);
 
   return (
     <div className="dark">
@@ -26,7 +15,7 @@ export function AppShell() {
         <Sidebar />
         <div className="relative flex min-w-0 flex-1 flex-col">
           <TopBar />
-          {!f.conv ? <Welcome /> : <ForgeWorkspace />}
+          {!f.conv ? <Welcome /> : <DecisionWorkbench />}
         </div>
         <Toasts />
       </div>
@@ -38,7 +27,7 @@ function TopBar() {
   const f = useForge();
 
   return (
-    <header className="relative z-20 flex h-[52px] shrink-0 items-center gap-2 border-b border-line bg-canvas/92 px-3 backdrop-blur-xl sm:px-4">
+    <header className="relative z-20 flex h-[58px] shrink-0 items-center gap-2 border-b border-line bg-canvas px-3 sm:px-6">
       <Button
         size="icon"
         variant="ghost"
@@ -51,7 +40,7 @@ function TopBar() {
 
       <div className="min-w-0 flex-1">
         {f.conv ? (
-          <span className="block truncate text-[14px] font-medium text-ink-2">{f.conv.title}</span>
+          <span className="block truncate text-[14px] font-normal text-ink-2">{f.conv.title}</span>
         ) : (
           <span className="text-[14px] text-ink-4">New idea</span>
         )}

@@ -7,6 +7,7 @@ function compactConversation(conversation: Conversation, mode: ForgeTurnMode) {
     stage: conversation.stage,
     productModel: conversation.productModel,
     research: conversation.research,
+    stressTest: conversation.stressTest,
     theses: conversation.theses,
     selectedThesis: conversation.selectedThesis,
     thesisLocked: conversation.thesisLocked,
